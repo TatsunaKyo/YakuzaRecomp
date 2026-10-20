@@ -12,7 +12,7 @@ With Visual Studio 2022's C++ workload, Git, Python 3.10+ and CMake installed, u
 cmake -S . -B "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" -A x64 `
   -DYAKUZA_BUILD_BOOT_PROBE=ON `
   -DYAKUZA_MAIN_GENERATED_DIR="D:\Yakuza Research\generated-pal-probe" `
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v4\generated" `
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v8\generated" `
   -DPS2X_ENABLE_FFMPEG=OFF
 cmake --build "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" --config Debug --parallel 2 --target yakuza_boot_probe
 & "$env:LOCALAPPDATA\YakuzaRecomp\boot-build\Debug\yakuza_boot_probe.exe" "D:\Yakuza PAL" 15 "$env:LOCALAPPDATA\YakuzaRecomp\boot-state"
@@ -38,7 +38,7 @@ cmake -S . -B /workspace/scratch/yakuza-pal/boot-build -G Ninja \
   -DCMAKE_PREFIX_PATH=/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr \
   -DYAKUZA_BUILD_BOOT_PROBE=ON \
   -DYAKUZA_MAIN_GENERATED_DIR=/workspace/scratch/yakuza-pal/generated-pal-probe \
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v4/generated
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v8/generated
 cmake --build /workspace/scratch/yakuza-pal/boot-build --target yakuza_boot_probe --parallel 2
 python tools/run_boot_probe.py \
   --exe /workspace/scratch/yakuza-pal/boot-build/yakuza_boot_probe \
@@ -68,13 +68,25 @@ The native FIO backend performs the real MAIN file reads. The virtual CD backend
 
 The module-start bridge retains the original EE-to-IOP DMA operation. Before executing a transferred module, it compares every transferred byte against its EE source and checks that all ELF tables and file-backed sections fit the transfer. It then invokes the real IOP module loader with that verified source and returns the actual module ID and start result to the game. All nine supplied driver modules started through this path in the Linux full-runtime run; audio output, controls and memory-card operation remain unverified.
 
-The PAL vertical-blank helper at `0x001056c0` registers two stack-local pointers with SetVSyncFlag and then polls INTC_STAT. The native MMIO poll can finish before the queued display event writes those locals. A trace caught that later write changing a saved return address from `0x0041b340` to `1`, followed by an invalid branch. The helper now waits for the scheduler's actual next vertical blank and returns GS CSR, preserving the 64-bit SDK result whose caller extracts FIELD at bit 13. It registers no temporary stack pointers. Bounded continued runs with the fix reach the frame loop without that invalid return; this does not establish a visible PAL selection screen or working controls.
+Command initialization also initializes the native RPC state before clients bind. The distinct routine at `0x0010a028` is fileXio initialization for SID `0x80000001`; its native binding checks the mounted disc directory. The observed fileXio device-control call at `0x0010cdd0` probes `hdd0:` and `hdd1:` with command `0x4807`. This host has no PS2 HDD device, so those requests return `-ENODEV` (`-19`) and the original detection continues. Other device-control requests remain explicit unsupported errors.
+
+The PAL vertical-blank helper at `0x001056c0` registers two stack-local pointers with SetVSyncFlag and then polls INTC_STAT. The native MMIO poll can finish before the queued display event writes those locals. A trace caught that later write changing a saved return address from `0x0041b340` to `1`, followed by an invalid branch. The helper now waits for the scheduler's actual next vertical blank and returns GS CSR, preserving the 64-bit SDK result whose caller extracts FIELD at bit 13. It registers no temporary stack pointers. Bounded continued runs with the fix reach the frame loop without that invalid return; this does not establish a visible PAL selection screen or full controller support.
+
+The runtime's call dispatcher also treated an unchanged entry PC as an implicit function return. During recursive guest calls, a scheduler safe point can leave PC at that same address while an outer guest stack frame remains active. Returning to the caller at that point corrupts subsequent stack restoration. The PAL runtime adaptation requires an explicit return to the caller PC instead. A synthetic regression forces this recursive yield: it fails with the pinned dispatch behavior and passes with the adaptation. Native SDK wrappers already set their return PC explicitly.
+
+## Host controller adapter
+
+The original PAL device bus uses DBC_Manager and ds2u_d, rather than the standard libpad calls. The adapter observes successful original controller-open RPC replies and retains their actual port/handle mapping. It leaves original IOP module loading and open operations intact. Three identified SDK calls use the host backend for the first logical port: readiness at `0x001263a0`, capabilities at `0x001262d0` and input data at `0x001261f8`. The original SDK active-handle flag must still be set.
+
+The adapter converts the native 32-byte PS2-format sample into the PAL 28-byte button/axis packet and 32-byte capability packet. It advertises sixteen digital buttons and four analog axes; pressure and rumble are not implemented. Other logical ports remain disconnected. Unit checks cover held/released buttons, axis ordering, digital-mode stick centering, unsupported samples and capability flags.
+
+In an internal Linux test, a real X11 X key press changed the sample from `ffff` to `bfff` (Cross held) and original execution left the PAL selection loop. This is evidence for that input path, not complete controller or Windows gameplay validation. Host keyboard mappings currently come from the pinned backend: X/Space for Cross, Enter for Start, arrow keys/WASD for the D-pad. Windows execution and physical gamepad behavior remain unverified.
 
 ## Newly discovered resident code
 
 The first constructor pass revealed a missing entry at `0x0013a2a0`. Its address comes from the original resident constructor table at `0x0013a304`. [SeedResidentCtor.java](../tools/ghidra/SeedResidentCtor.java) checks that pointer before changing Ghidra analysis metadata. It preserves all original bytes.
 
-[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The current v4 supplement translates 123 instructions in four ranges: the resident constructor, a graphics method and an observed callback with its tail body. Generation reports zero errors and two unresolved indirect-control-flow warnings. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings.
+[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The current v8 supplement translates 252 instructions in eight ranges: the resident constructor, a graphics method, an observed callback with its tail body, two input methods and two later callback/interface methods. Generation reports zero errors and two unresolved indirect-control-flow warnings. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings. When a newly identified method shares decoded bytes with an old chunk, registration checks the original address/slot pairs and preserves those existing mappings.
 
 The graphics method at `0x0018fda0` is referenced by the original vtable word at `0x0013a914`. Its bytes were already decoded at the end of another chunk, but had no callable registration. [SeedGraphicsEntry.java](../tools/ghidra/SeedGraphicsEntry.java) checks the vtable pointer before classifying the function. The supplemental generator's `--entry 0x18fda0` preserves that newly identified entry even though no new instruction bytes were discovered. It does not replace the original method's return value with an invented result.
 
@@ -99,4 +111,4 @@ The generator rejects overlapping regions. MAIN entry configures the separate he
 
 ## Public CI
 
-GitHub Actions builds the default tools on Windows/MSVC and Linux. A separate Windows host check compiles the full desktop runtime with clearly labeled synthetic code and exercises invalid-input rejection before window creation. This checks the host build without distributing original game files. It does not boot or validate the game.
+GitHub Actions builds the default tools on Windows/MSVC and Linux. A separate Windows host check compiles the full desktop runtime with clearly labeled synthetic code, exercises invalid-input rejection before window creation and checks recursive dispatch yields without a display. This checks the host build without distributing original game files. It does not boot or validate the game.

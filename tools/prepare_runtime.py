@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build a private PAL memory-layout adaptation of the pinned runtime.
+"""Build private PAL memory-layout and dispatch adaptations of the pinned runtime.
 
-Keep the dependency checkout intact. Only native helper addresses change;
-original game files and translated instructions are never patched here.
+Keep the dependency checkout intact. Original game files and translated
+instructions are never patched here.
 """
 import argparse
 import hashlib
@@ -67,6 +67,16 @@ def main():
                       f"m_asyncCallbackStackFloor = 0x{layout['callback_stacks']['start']:x}u;")
     runtime = replace(runtime, "m_asyncCallbackStackTop = PS2_RAM_SIZE;",
                       f"m_asyncCallbackStackTop = 0x{layout['callback_stacks']['end']:x}u;", 2)
+    runtime = replace(runtime, "    const uint32_t entryPc = ctx->pc;\n", "")
+    runtime = replace(runtime, """    if (ctx->pc == entryPc)
+    {
+        ctx->pc = fallthroughPc;
+    }
+
+""", """    // A recursive guest call may yield before re-entering this same address.
+    // Only an explicit guest return to fallthroughPc completes a call. Native
+    // SDK wrappers set PC to the caller before invoking their service.
+""")
     texts["ps2_runtime.cpp"] = runtime
     for path in source.rglob("*"):
         require(not path.is_symlink(), "Unexpected symlink in pinned runtime source")
@@ -81,7 +91,7 @@ def main():
     header += f"inline constexpr unsigned game_heap_end = 0x{layout['game_heap_end']:x}u;\n}}\n"
     save(output / "pal_runtime_layout.h", header.encode())
     save(output / "adaptation.json", (json.dumps({"source_sha256": HASHES, "layout": layout}, indent=2) + "\n").encode())
-    print("Prepared private PAL runtime: separate native helpers and original game heap")
+    print("Prepared private PAL runtime: separate heaps and preserve recursive dispatch yields")
 
 
 if __name__ == "__main__": main()

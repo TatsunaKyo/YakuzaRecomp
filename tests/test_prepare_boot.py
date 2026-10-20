@@ -4,7 +4,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from prepare_boot import extend_table
+from prepare_boot import dispatch_addresses, extend_table
 from prepare_game import FormatError
 from prepare_boot_supplement import subtract, supplement_ranges
 
@@ -20,6 +20,15 @@ void initialize() {
 
 
 class BootTableTests(unittest.TestCase):
+    def test_shared_decoded_entries_preserve_only_validated_baseline_addresses(self):
+        original = FIXTURE.replace("= first;", "= first; // 0x100008").replace(
+            "= last;", "= last; // 0x5918a0")
+        self.assertEqual(dispatch_addresses(original), {0x100008, 0x5918a0})
+        for bad in (original.replace("// 0x100008", "// 0x10000c"),
+                    original + "g_ps2RecompiledFunctionTable[0] = first; // 0x100008\n",
+                    FIXTURE):
+            with self.assertRaises(FormatError): dispatch_addresses(bad)
+
     def test_extension_keeps_original_mapping_and_null_overlay_slots(self):
         result = extend_table(FIXTURE)
         self.assertIn("TableEnd = 0x6ef500u", result)

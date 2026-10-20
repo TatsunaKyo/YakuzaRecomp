@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "yakuza/pal_boot_hooks.h"
+#include "yakuza/native_pad.h"
 #include "ps2_runtime_macros.h"
 #include "ps2_stubs.h"
 #include "ps2_syscalls.h"
 #include "runtime/ee_scheduler.h"
 #include "pal_runtime_layout.h"
 #include <algorithm>
+#include <array>
+#include <unordered_map>
 #include <iostream>
 #include <stdexcept>
 #include <utility>
@@ -15,9 +18,11 @@ namespace yakuza {
 namespace {
 struct DmaCopy { uint32_t source, destination, size; };
 std::vector<DmaCopy> dma_copies;
+std::unordered_map<int32_t, uint32_t> controller_handles;
 
 void reboot_iop(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
     dma_copies.clear();
+    controller_handles.clear();
     ps2_stubs::sceSifRebootIop(memory, context, runtime);
 }
 
@@ -136,9 +141,91 @@ void sdk_service(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
     context->pc = GPR_U32(context, 31);
     Handler(memory, context, runtime);
 }
+void call_rpc(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
+    // Observe successful original DBC open requests; never invent a game
+    // handle or bypass the original IOP open operation. The PAL wrapper at
+    // 0x126cb8 uses this fixed client/buffer and returns its handle at +0x24.
+    const uint32_t client = GPR_U32(context, 4), method = GPR_U32(context, 5);
+    const uint32_t send = GPR_U32(context, 7) & PS2_RAM_MASK;
+    const uint32_t resume = context->pc;
+    const bool open = client == 0x162ec8 && method == 0x80001301 && send == 0x162fc0 &&
+        Ps2FastRead32(memory, send) == 3 && Ps2FastRead32(memory, send + 4) == 1;
+    const uint32_t port = open ? Ps2FastRead32(memory, send + 8) : 0;
+    ps2_syscalls::SifCallRpc(memory, context, runtime);
+    if (open && port < 8 && context->pc == resume && GPR_S32(context, 2) == 0) {
+        const int32_t handle = static_cast<int32_t>(Ps2FastRead32(memory, send + 0x24));
+        if (handle >= 0 && handle < 8) {
+            controller_handles[handle] = port;
+            std::cout << "[yakuza-pad] observed original open port=" << port << " handle=" << handle << '\n';
+        }
+    }
+}
+std::optional<DbcPadPacket> sample_controller(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
+    const int32_t handle = GPR_S32(context, 4);
+    const auto found = controller_handles.find(handle);
+    // Only the first logical port is connected to the host keyboard/gamepad.
+    // The original SDK's active flag must still indicate an open handle.
+    if (found == controller_handles.end() || found->second != 0 || handle < 0 || handle >= 8 ||
+        Ps2FastRead32(memory, 0x15fb58 + static_cast<uint32_t>(handle) * 0x334) != 1)
+        return std::nullopt;
+    std::array<uint8_t, 32> sample{};
+    if (!runtime->padBackend().readState(0, 0, sample.data(), sample.size())) return std::nullopt;
+    return make_dbc_pad_packet(sample);
+}
+void controller_status(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
+    const bool connected = sample_controller(memory, context, runtime).has_value();
+    SET_GPR_S32(context, 2, connected ? 1 : 0);
+}
+template<bool Capabilities>
+void controller_read(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
+    const uint32_t output = GPR_U32(context, 5) & PS2_RAM_MASK;
+    constexpr uint32_t size = Capabilities ? 32 : 28;
+    if (!output || size > PS2_RAM_SIZE - output) {
+        SET_GPR_S32(context, 2, -1); return;
+    }
+    const auto packet = sample_controller(memory, context, runtime);
+    if (!packet) {
+        SET_GPR_S32(context, 2, -1); return;
+    }
+    if constexpr (Capabilities) std::copy(packet->capabilities.begin(), packet->capabilities.end(), memory + output);
+    else std::copy(packet->state.begin(), packet->state.end(), memory + output);
+    static unsigned logged = 0;
+    static uint16_t last_buttons = 0xffff;
+    const uint16_t buttons = unsigned(packet->state[0]) | unsigned(packet->state[1]) << 8;
+    if (logged < 8 || (buttons != last_buttons && logged < 32)) {
+        ++logged;
+        std::cout << "[yakuza-pad] " << (Capabilities ? "capabilities" : "sample")
+                  << " handle=" << GPR_S32(context, 4) << " buttons=" << std::hex
+                  << buttons << std::dec << '\n';
+    }
+    last_buttons = buttons;
+    SET_GPR_S32(context, 2, size);
+}
 void init_rpc(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
     ps2_stubs::sceSifInitCmd(memory, context, runtime);
     ps2_syscalls::SifInitRpc(memory, context, runtime);
+}
+void init_fileio(uint8_t*, R5900Context* context, PS2Runtime*) {
+    // 0x10a028 initializes fileXio (SID 0x80000001), not the general RPC
+    // layer. Native file calls use the real mounted host directory directly.
+    const auto paths = PS2Runtime::getIoPaths();
+    SET_GPR_S32(context, 2, std::filesystem::is_directory(paths.cdRoot) ? 0 : -19);
+}
+void device_control(uint8_t* memory, R5900Context* context, PS2Runtime*) {
+    const uint32_t address = GPR_U32(context, 4) & PS2_RAM_MASK;
+    std::string path;
+    for (uint32_t i = address; i < PS2_RAM_SIZE && i - address < 512 && memory[i]; ++i)
+        path += static_cast<char>(memory[i]);
+    // This host mounts the disc and memory-card directories, with no PS2 HDD.
+    // Report the actual unavailable device so the original detection falls
+    // back to disc operation. Do not manufacture a successful HDD response.
+    if (path.starts_with("hdd0:") || path.starts_with("hdd1:")) {
+        std::cout << "[yakuza-file] devctl " << path << " command=0x" << std::hex
+                  << GPR_U32(context, 5) << std::dec << " result=-19 (no HDD device)\n";
+        SET_GPR_S32(context, 2, -19);
+        return;
+    }
+    throw std::runtime_error("Unsupported native device-control request: " + path);
 }
 void init_heap(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
     ps2_stubs::sceSifInitIopHeap(memory, context, runtime);
@@ -199,10 +286,10 @@ void install_pal_sdk_hooks(PS2Runtime& runtime) {
     // ABI and CheckStatRpc tests the client's active packet. These route to
     // implemented native services, rather than fabricated success returns.
     const std::pair<uint32_t, PS2Runtime::RecompiledFunction> services[] = {
-        {0x108760u, sdk_service<ps2_stubs::sceSifInitCmd>},
-        {0x10a028u, sdk_service<init_rpc>},
+        {0x108760u, sdk_service<init_rpc>},
+        {0x10a028u, sdk_service<init_fileio>},
         {0x108f08u, sdk_service<ps2_syscalls::SifBindRpc>},
-        {0x1090e8u, sdk_service<ps2_syscalls::SifCallRpc>},
+        {0x1090e8u, sdk_service<call_rpc>},
         {0x1092e8u, sdk_service<ps2_syscalls::SifCheckStatRpc>},
         // CD initialization binds the physical CDVD service at SID 0x80000592.
         // The native CD backend mounts host files instead of an IOP CDVD IRX.
@@ -219,6 +306,7 @@ void install_pal_sdk_hooks(PS2Runtime& runtime) {
         {0x10a930u, sdk_service<ps2_syscalls::fioLseek>},
         {0x10ab70u, sdk_service<ps2_syscalls::fioRead>},
         {0x10a7b8u, sdk_service<ps2_syscalls::fioClose>},
+        {0x10cdd0u, sdk_service<device_control>},
         // SID 0x80000003 is the IOP heap service. The original wrappers use
         // RPC 1(size) and RPC 2(pointer); the native allocator owns that heap.
         {0x10d450u, sdk_service<init_heap>},
@@ -238,6 +326,9 @@ void install_pal_sdk_hooks(PS2Runtime& runtime) {
         {0x10db68u, sdk_service<exec_iop_buffer>},
         {0x105180u, sdk_service<end_of_heap>},
         {0x1056c0u, sdk_service<wait_vertical_blank>},
+        {0x1263a0u, sdk_service<controller_status>},
+        {0x1262d0u, sdk_service<controller_read<true>>},
+        {0x1261f8u, sdk_service<controller_read<false>>},
     };
     for (const auto& [address, handler] : services) {
         if (!runtime.hasFunction(address) || !runtime.replaceFunction(address, handler))
