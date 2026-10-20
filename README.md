@@ -29,7 +29,7 @@ The original loader now reads MAIN.BIN and reaches its entry point in the Linux 
 
 The supplied files are sufficient for the current analysis and diagnostic checks. OGRE.CVM, OGRE2.CVM and OGRE3.CVM contain further assets that will be needed for game boot and play testing. Specific required files should be identified from runtime failures before requesting more uploads.
 
-**Next required input:** the continued PAL boot now requests `PAL_NTSC.DAT` from the disc root. Its lookup fails in the current cloud input folder. Supply that original file to investigate the next boot stage; it is not included in this repository.
+The supplied `PAL_NTSC.DAT` now loads through the original disc-read path. A vertical-blank compatibility fix prevents a delayed display event from corrupting a returned SDK stack frame. Continued Linux execution reaches the frame loop, but captured output is still blank/incorrect. Rendering and controller initialization are the next debugging targets; no further upload is currently needed for that work.
 
 There is no release date yet. Completing translation is one part of the work; runtime behavior and game compatibility still need substantial development.
 
@@ -39,7 +39,7 @@ There is no release date yet. Completing translation is one part of the work; ru
 - A static generation probe reports zero unhandled-instruction errors, with unresolved control-flow warnings still remaining.
 - The resident/MAIN translation compiles and links with the full desktop runtime for Linux x86-64 and Windows x64. A newly discovered resident constructor is translated separately, with the original instruction bytes verified.
 - All nine original driver modules from the supplied PAL IRX.DAT initialized in the minimal IOP probe, creating eight RPC servers. This does not verify audio, controller or memory-card behavior.
-- Continued MAIN execution also loads and starts all nine drivers through the original game's DMA/module-loading path in the full runtime. After a native memory-layout correction, the graphics allocation succeeds and execution reaches PAL display-mode setup. Additional graphics code coverage remains under investigation.
+- Continued MAIN execution also loads and starts all nine drivers through the original game's DMA/module-loading path in the full runtime. After native memory-layout and vertical-blank corrections, the graphics allocation succeeds, PAL_NTSC.DAT loads and execution continues through the frame loop. Correct rendering remains unverified.
 - All four archive indexes parsed: 18,685 files. The supplied OGRE4.CVM yielded all 11 gameplay/minigame overlays; their sizes match the original ELF's overlay slots.
 - All 11 overlays analyzed separately: 10,348 decoded code ranges, 865,866 instructions, zero translation errors and 7,460 unresolved control-flow warnings. This does not establish complete code coverage.
 - A native overlay loader copies original payloads, clears BSS and replaces the prior overlay's dispatch table. Its connection to the full game runtime remains to be implemented.

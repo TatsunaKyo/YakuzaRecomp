@@ -1,6 +1,6 @@
 # Full-runtime boot development
 
-The opt-in `yakuza_boot_probe` target links the verified resident/MAIN translation to the full PS2Recomp desktop runtime. The Linux native run now passes its first milestone: the original loader reads MAIN.BIN and reaches `0x0022cc40`. The probe verifies the original MAIN code in memory, then deliberately stops before executing its body. With `continue` enabled, MAIN reads IRX.DAT and starts all nine original drivers before the next initialization stall. This executable is not a playable release.
+The opt-in `yakuza_boot_probe` target links the verified resident/MAIN translation to the full PS2Recomp desktop runtime. The Linux native run now passes its first milestone: the original loader reads MAIN.BIN and reaches `0x0022cc40`. The probe verifies the original MAIN code in memory, then deliberately stops before executing its body. With `continue` enabled, MAIN reads IRX.DAT, starts all nine original drivers and loads PAL_NTSC.DAT. Execution continues through the frame loop, but captured output is blank/incorrect. This executable is not a playable release.
 
 Original disc files and generated game source remain outside the repository. The default build does not fetch graphics dependencies or compile game code. Enable this target only when private verified translations are available.
 
@@ -48,9 +48,9 @@ python tools/run_boot_probe.py \
   --xvfb /workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr/bin/Xvfb
 ```
 
-Choose a fresh output directory for each run. The runner preserves the executable digest, original input hashes, exit status and trace. Its outer timeout can kill a stuck process if the runtime's cooperative stop fails. The temporary display is shut down afterward. The native run may report no available audio device in the cloud; this does not test sound output. Save-state paths are separate from the original disc files.
+Choose a fresh output directory for each run. The runner preserves the executable digest, original input hashes, exit status and trace. Available IRX.DAT, IOPRP300.IMG and PAL_NTSC.DAT hashes are also recorded, without requiring them for the earlier MAIN checkpoint. Its outer timeout can kill a stuck process if the runtime's cooperative stop fails. The temporary display is shut down afterward. The native run may report no available audio device in the cloud; this does not test sound output. Save-state paths are separate from the original disc files.
 
-Add `--continue-main` to the Python command to continue into MAIN. This mode also records register values at shutdown. The supplied inputs currently reach a failed lookup of `PAL_NTSC.DAT` in the disc root; supply that original PAL file before continuing dependent boot investigation. Missing second-layer probes return the normal SDK search-failure result.
+Add `--continue-main` to the Python command to continue into MAIN. This mode also records register values, display/DMA activity and IOP diagnostics at shutdown. PAL_NTSC.DAT is now supplied and its original two-part sector read completes. No subsequent missing-file request has been observed. Missing second-layer probes return the normal SDK search-failure result.
 
 ## Native kernel compatibility
 
@@ -68,6 +68,8 @@ The native FIO backend performs the real MAIN file reads. The virtual CD backend
 
 The module-start bridge retains the original EE-to-IOP DMA operation. Before executing a transferred module, it compares every transferred byte against its EE source and checks that all ELF tables and file-backed sections fit the transfer. It then invokes the real IOP module loader with that verified source and returns the actual module ID and start result to the game. All nine supplied driver modules started through this path in the Linux full-runtime run; audio output, controls and memory-card operation remain unverified.
 
+The PAL vertical-blank helper at `0x001056c0` registers two stack-local pointers with SetVSyncFlag and then polls INTC_STAT. The native MMIO poll can finish before the queued display event writes those locals. A trace caught that later write changing a saved return address from `0x0041b340` to `1`, followed by an invalid branch. The helper now waits for the scheduler's actual next vertical blank and returns GS CSR, preserving the 64-bit SDK result whose caller extracts FIELD at bit 13. It registers no temporary stack pointers. Bounded continued runs with the fix reach the frame loop without that invalid return; this does not establish a visible PAL selection screen or working controls.
+
 ## Newly discovered resident code
 
 The first constructor pass revealed a missing entry at `0x0013a2a0`. Its address comes from the original resident constructor table at `0x0013a304`. [SeedResidentCtor.java](../tools/ghidra/SeedResidentCtor.java) checks that pointer before changing Ghidra analysis metadata. It preserves all original bytes.
@@ -76,7 +78,7 @@ The first constructor pass revealed a missing entry at `0x0013a2a0`. Its address
 
 The graphics method at `0x0018fda0` is referenced by the original vtable word at `0x0013a914`. Its bytes were already decoded at the end of another chunk, but had no callable registration. [SeedGraphicsEntry.java](../tools/ghidra/SeedGraphicsEntry.java) checks the vtable pointer before classifying the function. The supplemental generator's `--entry 0x18fda0` preserves that newly identified entry even though no new instruction bytes were discovered. It does not replace the original method's return value with an invented result.
 
-[SeedObservedEntry.java](../tools/ghidra/SeedObservedEntry.java) handles additional indirect entries observed in verified boot traces. It checks the original first instruction before changing analysis metadata and rejects conflicts with classified functions. The current callback at `0x0017eb40` came from a runtime JALR target. Its original code now executes and reaches the next missing disc-file request.
+[SeedObservedEntry.java](../tools/ghidra/SeedObservedEntry.java) handles additional indirect entries observed in verified boot traces. It checks the original first instruction before changing analysis metadata and rejects conflicts with classified functions. The current callback at `0x0017eb40` came from a runtime JALR target. Its original code now executes and reaches the PAL_NTSC.DAT read.
 
 ## PAL native memory layout
 

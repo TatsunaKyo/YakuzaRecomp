@@ -3,6 +3,7 @@
 #include "ps2_runtime_macros.h"
 #include "ps2_stubs.h"
 #include "ps2_syscalls.h"
+#include "runtime/ee_scheduler.h"
 #include "pal_runtime_layout.h"
 #include <algorithm>
 #include <iostream>
@@ -146,6 +147,20 @@ void init_heap(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
 void end_of_heap(uint8_t*, R5900Context* context, PS2Runtime*) {
     SET_GPR_U32(context, 2, pal_memory::game_heap_end);
 }
+void wait_vertical_blank(uint8_t*, R5900Context* context, PS2Runtime* runtime) {
+    // The PAL SDK registers two stack locals with SetVSyncFlag, then polls
+    // INTC_STAT. Native MMIO can satisfy that poll before the queued VBlank
+    // writes those locals, leaving stale pointers into a returned stack frame.
+    // Wait on the actual scheduler event instead, and retain the SDK's 64-bit
+    // GS CSR return value (its caller extracts FIELD at bit 13).
+    auto& scheduler = runtime->eeScheduler();
+    const uint32_t resume = GPR_U32(context, 31);
+    scheduler.waitVSync(scheduler.currentVSyncTick(), 0,
+        [runtime, resume](R5900Context& resumed) {
+            SET_GPR_U64((&resumed), 2, runtime->memory().gs().csr.load(std::memory_order_acquire));
+            resumed.pc = resume;
+        });
+}
 void debug_console(uint8_t* memory, R5900Context* context, PS2Runtime*) {
     // The PAL SDK's DECI2 console blocks awaiting a physical debug interface.
     // Preserve its actual write(buffer, length) operation through the host.
@@ -222,6 +237,7 @@ void install_pal_sdk_hooks(PS2Runtime& runtime) {
         {0x105560u, sdk_service<set_dma>},
         {0x10db68u, sdk_service<exec_iop_buffer>},
         {0x105180u, sdk_service<end_of_heap>},
+        {0x1056c0u, sdk_service<wait_vertical_blank>},
     };
     for (const auto& [address, handler] : services) {
         if (!runtime.hasFunction(address) || !runtime.replaceFunction(address, handler))

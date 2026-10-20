@@ -15,6 +15,13 @@ import subprocess
 from prepare_game import PAL_INPUTS, read_small, require, sha256
 
 
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as binary:
+        while chunk := binary.read(1024 * 1024): digest.update(chunk)
+    return digest.hexdigest()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--exe", required=True, type=Path)
@@ -35,11 +42,13 @@ def main():
     result = {"exit_code": None, "timed_out": False, "reached_main": False,
               "platform": os.name, "time_limit_seconds": args.seconds}
     result["continue_main"] = args.continue_main
-    digest = hashlib.sha256()
-    with args.exe.open("rb") as binary:
-        while chunk := binary.read(1024 * 1024): digest.update(chunk)
-    result["exe_sha256"] = digest.hexdigest()
+    result["exe_sha256"] = file_sha256(args.exe)
     result["input_sha256"] = PAL_INPUTS.copy()
+    # Auxiliary boot data changes execution too. Record the actual supplied
+    # bytes without making these files a prerequisite for the MAIN checkpoint.
+    for name in ("IRX.DAT", "IOPRP300.IMG", "PAL_NTSC.DAT"):
+        path = args.disc_dir / name
+        if path.is_file(): result["input_sha256"][name] = file_sha256(path)
     try:
         if args.xvfb:
             require(os.name == "posix", "Xvfb is only for internal Linux execution")

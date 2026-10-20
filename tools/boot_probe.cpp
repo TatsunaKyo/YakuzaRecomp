@@ -2,6 +2,7 @@
 // Bounded full-runtime boot diagnostic. This is not a validated game release.
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "runtime/ee_scheduler.h"
 #include "ps2_recompiled_functions.h"
 #include "yakuza/pal_boot_hooks.h"
 #include "pal_runtime_layout.h"
@@ -80,6 +81,18 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
     std::cout << "[yakuza-boot] final PC=0x" << std::hex << runtime.cpu().pc << std::dec
               << " reached_main=" << reached_main.load() << '\n';
     if (continue_main) {
+        const auto iop = runtime.iopDebugSnapshot();
+        std::cout << "[yakuza-runtime] vsync=" << runtime.eeScheduler().currentVSyncTick()
+                  << " dma=" << runtime.memory().dmaStartCount()
+                  << " gif=" << runtime.memory().gifCopyCount()
+                  << " gs=" << runtime.memory().gsWriteCount()
+                  << " vif=" << runtime.memory().vifWriteCount()
+                  << " iop_modules=" << iop.emulatorLoadedModules
+                  << " iop_threads=" << iop.emulatorThreads
+                  << " iop_rpc_servers=" << iop.emulatorRpcServers
+                  << " iop_instructions=" << iop.emulatorInstructions << '\n';
+        for (const auto& diagnostic : iop.diagnostics)
+            std::cout << "[yakuza-iop-diagnostic] " << diagnostic << '\n';
         for (unsigned reg = 1; reg < 32; ++reg)
             std::cout << "[yakuza-register] r" << reg << "=0x" << std::hex
                       << GPR_U64((&runtime.cpu()), reg) << std::dec << '\n';
