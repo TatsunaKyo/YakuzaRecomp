@@ -52,7 +52,7 @@ file(GLOB boot_generated CONFIGURE_DEPENDS "${YAKUZA_MAIN_GENERATED_DIR}/*.cpp")
 list(REMOVE_ITEM boot_generated "${YAKUZA_MAIN_GENERATED_DIR}/register_functions.cpp")
 add_executable(yakuza_boot_probe tools/boot_probe.cpp src/pal_boot_hooks.cpp
     "${boot_private}/register_boot.cpp" "${boot_private}/boot_supplement.cpp" ${boot_generated})
-target_link_libraries(yakuza_boot_probe PRIVATE ps2_runtime yakuza_overlay yakuza_input)
+target_link_libraries(yakuza_boot_probe PRIVATE ps2_runtime yakuza_overlay yakuza_input yakuza_disc_ranges)
 target_include_directories(yakuza_boot_probe PRIVATE "${YAKUZA_MAIN_GENERATED_DIR}")
 # Per-source include keeps the translated-code PCH independent of native layout.
 set_source_files_properties(tools/boot_probe.cpp src/pal_boot_hooks.cpp PROPERTIES

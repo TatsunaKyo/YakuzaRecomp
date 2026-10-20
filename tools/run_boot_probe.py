@@ -49,6 +49,10 @@ def main():
     for name in ("IRX.DAT", "IOPRP300.IMG", "PAL_NTSC.DAT"):
         path = args.disc_dir / name
         if path.is_file(): result["input_sha256"][name] = file_sha256(path)
+    excerpts = args.disc_dir / ".yakuza-disc-ranges"
+    if excerpts.is_dir():
+        for path in sorted(excerpts.glob("*.ykr")):
+            result["input_sha256"][".yakuza-disc-ranges/" + path.name] = file_sha256(path)
     try:
         if args.xvfb:
             require(os.name == "posix", "Xvfb is only for internal Linux execution")

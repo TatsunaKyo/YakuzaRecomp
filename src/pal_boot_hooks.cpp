@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "yakuza/pal_boot_hooks.h"
 #include "yakuza/native_pad.h"
+#include "yakuza/disc_ranges.h"
 #include "ps2_runtime_macros.h"
 #include "ps2_stubs.h"
 #include "ps2_syscalls.h"
@@ -13,12 +14,79 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include <cctype>
 
 namespace yakuza {
 namespace {
 struct DmaCopy { uint32_t source, destination, size; };
 std::vector<DmaCopy> dma_copies;
 std::unordered_map<int32_t, uint32_t> controller_handles;
+DiscRanges disc_ranges;
+std::optional<int32_t> excerpt_cd_error;
+constexpr std::array<const char*, 4> archive_names{"OGRE.CVM", "OGRE2.CVM", "OGRE3.CVM", "OGRE4.CVM"};
+constexpr uint32_t archive_lsn(unsigned index) { return 0x1000000 + index * 0x200000; }
+
+void search_disc(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
+    excerpt_cd_error.reset();
+    if (GPR_U32(context, 6) != 0) {
+        SET_GPR_S32(context, 2, 0); // Only the first disc layer is mounted.
+        return;
+    }
+    ps2_stubs::sceCdSearchFile(memory, context, runtime);
+    if (GPR_S32(context, 2) != 0) return; // Prefer a complete original host file.
+    const uint32_t input = GPR_U32(context, 5) & PS2_RAM_MASK;
+    std::string path;
+    for (uint32_t i = input; i < PS2_RAM_SIZE && i - input < 512 && memory[i]; ++i)
+        path += static_cast<char>(std::toupper(static_cast<unsigned char>(memory[i])));
+    for (unsigned index = 0; index < archive_names.size(); ++index) {
+        const std::string name = archive_names[index];
+        if (path != "\\" + name + ";1" && path != name && path != "\\" + name) continue;
+        const auto size = disc_ranges.size(name);
+        if (!size) return;
+        const uint32_t output = GPR_U32(context, 4) & PS2_RAM_MASK;
+        if (!output || output > PS2_RAM_SIZE - 32) throw std::runtime_error("Archive search output exceeds EE RAM");
+        std::fill_n(memory + output, 32, uint8_t{0});
+        Ps2FastWrite32(memory, output, archive_lsn(index));
+        Ps2FastWrite32(memory, output + 4, static_cast<uint32_t>(*size));
+        std::copy(name.begin(), name.end(), memory + output + 8);
+        SET_GPR_S32(context, 2, 1);
+        excerpt_cd_error = 0;
+        std::cout << "[yakuza-disc] mounted original excerpts for " << name << " logical_bytes=" << *size
+                  << " lsn=0x" << std::hex << archive_lsn(index) << std::dec << '\n';
+        return;
+    }
+}
+void read_disc(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
+    excerpt_cd_error.reset();
+    const uint32_t lsn = GPR_U32(context, 4), sectors = GPR_U32(context, 5);
+    for (unsigned index = 0; index < archive_names.size(); ++index) {
+        if (lsn < archive_lsn(index) || lsn >= archive_lsn(index) + 0x200000) continue;
+        const std::string name = archive_names[index];
+        const auto size = disc_ranges.size(name);
+        const uint64_t offset = uint64_t(lsn - archive_lsn(index)) * 2048;
+        const uint64_t count = uint64_t(sectors) * 2048;
+        const uint32_t output = GPR_U32(context, 6) & PS2_RAM_MASK;
+        if (!size || !count || count > PS2_RAM_SIZE - output || offset >= *size ||
+            count > ((*size + 2047) / 2048) * 2048 - offset)
+            throw std::runtime_error("Invalid original archive sector request");
+        const size_t actual = static_cast<size_t>(std::min(count, *size - offset));
+        if (!disc_ranges.read(name, offset, std::span(memory + output, actual))) {
+            std::cerr << "[yakuza-disc:missing-range] archive=" << name << " offset=0x" << std::hex
+                      << offset << " length=0x" << actual << std::dec << '\n';
+            throw std::runtime_error("Original archive bytes are not supplied; collect the logged range");
+        }
+        // Only final-sector padding beyond the real file size is zero-filled.
+        std::fill(memory + output + actual, memory + output + count, uint8_t{0});
+        excerpt_cd_error = 0;
+        SET_GPR_S32(context, 2, 1);
+        return;
+    }
+    ps2_stubs::sceCdRead(memory, context, runtime);
+}
+void disc_error(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
+    if (excerpt_cd_error) SET_GPR_S32(context, 2, *excerpt_cd_error);
+    else ps2_stubs::sceCdGetError(memory, context, runtime);
+}
 
 void reboot_iop(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
     dma_copies.clear();
@@ -120,14 +188,14 @@ void sdk_service(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
     if (logged++ < 8)
         std::cout << "[yakuza-sdk] native SDK service for 0x" << std::hex << context->pc
                   << " a0=0x" << GPR_U32(context, 4) << " a1=0x" << GPR_U32(context, 5) << std::dec << '\n';
-    if constexpr (Handler == ps2_syscalls::fioOpen || Handler == ps2_stubs::sceCdSearchFile) {
+    if constexpr (Handler == ps2_syscalls::fioOpen || Handler == search_disc) {
         const unsigned path_register = Handler == ps2_syscalls::fioOpen ? 4 : 5;
         const uint32_t address = GPR_U32(context, path_register) & PS2_RAM_MASK;
         std::string path;
         for (uint32_t i = address; i < PS2_RAM_SIZE && i - address < 512 && memory[i]; ++i)
             path += static_cast<char>(memory[i]);
         std::cout << "[yakuza-file] " << (Handler == ps2_syscalls::fioOpen ? "open " : "search ") << path << '\n';
-        if constexpr (Handler == ps2_stubs::sceCdSearchFile) {
+        if constexpr (Handler == search_disc) {
             if (GPR_U32(context, 6) != 0) {
                 std::cout << "[yakuza-file] requested disc layer is not mounted\n";
                 SET_GPR_S32(context, 2, 0); // SDK search failure; allow the original fallback handling.
@@ -280,6 +348,8 @@ void install_pal_kernel_hooks(PS2Runtime& runtime) {
 }
 
 void install_pal_sdk_hooks(PS2Runtime& runtime) {
+    disc_ranges.load(PS2Runtime::getIoPaths().cdRoot / ".yakuza-disc-ranges");
+    excerpt_cd_error.reset();
     // Identified from the PAL disassembly/decompilation: CMD initialization
     // waits on SREG[0]; RPC init installs command IDs 0x80000011/13; BindRpc
     // stores the SID and client pointer; CallRpc has the standard nine-argument
@@ -315,13 +385,13 @@ void install_pal_sdk_hooks(PS2Runtime& runtime) {
         {0x1068f8u, sdk_service<debug_console>},
         // Layer search has the same file/path arguments; only layer zero is
         // mounted by this development host's virtual disc backend.
-        {0x115910u, sdk_service<ps2_stubs::sceCdSearchFile>},
+        {0x115910u, sdk_service<search_disc>},
         // The virtual CD backend completes reads synchronously and retains the
         // real host-file error for GetError. It does not send CDVD RPC packets.
-        {0x116858u, sdk_service<ps2_stubs::sceCdRead>},
+        {0x116858u, sdk_service<read_disc>},
         {0x115e20u, sdk_service<ps2_stubs::sceCdSync>},
         {0x115d88u, sdk_service<ps2_stubs::sceCdGetDiskType>},
-        {0x116b08u, sdk_service<ps2_stubs::sceCdGetError>},
+        {0x116b08u, sdk_service<disc_error>},
         {0x105560u, sdk_service<set_dma>},
         {0x10db68u, sdk_service<exec_iop_buffer>},
         {0x105180u, sdk_service<end_of_heap>},

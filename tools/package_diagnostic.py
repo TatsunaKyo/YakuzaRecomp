@@ -20,6 +20,8 @@ SOURCE_FILES = [
     "tools/ghidra/SeedObservedEntry.java",
     "include/yakuza/overlay_slot.h", "src/overlay_slot.cpp",
     "include/yakuza/native_pad.h", "src/native_pad.cpp", "tests/test_native_pad.cpp",
+    "include/yakuza/disc_ranges.h", "src/disc_ranges.cpp", "tools/disc_ranges.py",
+    "tests/test_disc_ranges.cpp", "tests/test_disc_ranges.py", "docs/disc-ranges.md",
     "tests/test_overlay_image.py", "tests/test_overlay_slot.cpp",
     "cmake/boot-probe.cmake", "docs/boot-probe.md", "include/yakuza/pal_boot_hooks.h",
     "src/pal_boot_hooks.cpp", "tools/boot_probe.cpp", "tools/prepare_boot.py", "tools/run_boot_probe.py", "tools/prepare_boot_supplement.py",

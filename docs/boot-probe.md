@@ -12,7 +12,7 @@ With Visual Studio 2022's C++ workload, Git, Python 3.10+ and CMake installed, u
 cmake -S . -B "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" -A x64 `
   -DYAKUZA_BUILD_BOOT_PROBE=ON `
   -DYAKUZA_MAIN_GENERATED_DIR="D:\Yakuza Research\generated-pal-probe" `
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v8\generated" `
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v17\generated" `
   -DPS2X_ENABLE_FFMPEG=OFF
 cmake --build "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" --config Debug --parallel 2 --target yakuza_boot_probe
 & "$env:LOCALAPPDATA\YakuzaRecomp\boot-build\Debug\yakuza_boot_probe.exe" "D:\Yakuza PAL" 15 "$env:LOCALAPPDATA\YakuzaRecomp\boot-state"
@@ -33,12 +33,12 @@ source /workspace/.cache/yakuza-onboarding/activate.sh
 export PKG_CONFIG_LIBDIR=/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr/lib/x86_64-linux-gnu/pkgconfig:/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr/share/pkgconfig
 export PKG_CONFIG_SYSROOT_DIR=/workspace/.cache/yakuza-onboarding/desktop-sdk/root
 cmake -S . -B /workspace/scratch/yakuza-pal/boot-build -G Ninja \
-  -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=OFF \
+  -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON \
   -DFETCHCONTENT_SOURCE_DIR_PS2RECOMP=/workspace/.cache/yakuza-onboarding/PS2Recomp \
   -DCMAKE_PREFIX_PATH=/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr \
   -DYAKUZA_BUILD_BOOT_PROBE=ON \
   -DYAKUZA_MAIN_GENERATED_DIR=/workspace/scratch/yakuza-pal/generated-pal-probe \
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v8/generated
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v17/generated
 cmake --build /workspace/scratch/yakuza-pal/boot-build --target yakuza_boot_probe --parallel 2
 python tools/run_boot_probe.py \
   --exe /workspace/scratch/yakuza-pal/boot-build/yakuza_boot_probe \
@@ -50,7 +50,9 @@ python tools/run_boot_probe.py \
 
 Choose a fresh output directory for each run. The runner preserves the executable digest, original input hashes, exit status and trace. Available IRX.DAT, IOPRP300.IMG and PAL_NTSC.DAT hashes are also recorded, without requiring them for the earlier MAIN checkpoint. Its outer timeout can kill a stuck process if the runtime's cooperative stop fails. The temporary display is shut down afterward. The native run may report no available audio device in the cloud; this does not test sound output. Save-state paths are separate from the original disc files.
 
-Add `--continue-main` to the Python command to continue into MAIN. This mode also records register values, display/DMA activity and IOP diagnostics at shutdown. PAL_NTSC.DAT is now supplied and its original two-part sector read completes. No subsequent missing-file request has been observed. Missing second-layer probes return the normal SDK search-failure result.
+Add `--continue-main` to the Python command to continue into MAIN. This mode also records register values, display/DMA activity and IOP diagnostics at shutdown. PAL_NTSC.DAT is now supplied and its original two-part sector read completes. A host Cross press leaves the selection loop and reaches filesystem initialization, which searches for the absent OGRE.CVM, OGRE2.CVM and OGRE3.CVM. Missing second-layer probes return the normal SDK search-failure result.
+
+The optional [private archive-range reader](disc-ranges.md) mounts original logical file sizes from supplied excerpt records, using separate virtual sector addresses. Complete original files take priority. The host checks complete byte coverage before writing guest RAM and stops on a missing range. This permits small Windows uploads while tracing initial asset needs; it does not supply the missing archives or establish a playable boot.
 
 ## Native kernel compatibility
 
@@ -86,7 +88,7 @@ In an internal Linux test, a real X11 X key press changed the sample from `ffff`
 
 The first constructor pass revealed a missing entry at `0x0013a2a0`. Its address comes from the original resident constructor table at `0x0013a304`. [SeedResidentCtor.java](../tools/ghidra/SeedResidentCtor.java) checks that pointer before changing Ghidra analysis metadata. It preserves all original bytes.
 
-[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The current v8 supplement translates 252 instructions in eight ranges: the resident constructor, a graphics method, an observed callback with its tail body, two input methods and two later callback/interface methods. Generation reports zero errors and two unresolved indirect-control-flow warnings. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings. When a newly identified method shares decoded bytes with an old chunk, registration checks the original address/slot pairs and preserves those existing mappings.
+[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The v17 supplement translates 474 instructions in 25 ranges, including the resident constructor and observed graphics, input and filesystem methods. Generation reports zero errors and two unresolved indirect-control-flow warnings. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings. When a newly identified method shares decoded bytes with an old chunk, registration checks the original address/slot pairs and preserves those existing mappings.
 
 The graphics method at `0x0018fda0` is referenced by the original vtable word at `0x0013a914`. Its bytes were already decoded at the end of another chunk, but had no callable registration. [SeedGraphicsEntry.java](../tools/ghidra/SeedGraphicsEntry.java) checks the vtable pointer before classifying the function. The supplemental generator's `--entry 0x18fda0` preserves that newly identified entry even though no new instruction bytes were discovered. It does not replace the original method's return value with an invented result.
 

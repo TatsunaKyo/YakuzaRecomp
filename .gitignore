@@ -25,3 +25,6 @@ SLUS_*
 *.obj
 *.exe
 *.dll
+*.ykr
+/.yakuza-disc-ranges/
+*boot-data*.zip
