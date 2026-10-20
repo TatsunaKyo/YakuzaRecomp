@@ -20,10 +20,10 @@ Upstream copyright notices and licenses are retained. See [third-party notices](
 
 ## What happens next
 
-The next milestone is a Windows development executable that runs the original loader and reaches MAIN initialization with useful diagnostics. This is a boot milestone; it does not promise a working title screen or playable game.
+The original loader now reads MAIN.BIN and reaches its entry point in the Linux native runtime. The boot probe verifies the original MAIN code in memory before recording that milestone. Continued execution enters MAIN initialization and exposes the next unsupported SDK services. There is no working title screen yet.
 
-1. **Connect the runtime.** Link the translated resident/MAIN code to PS2Recomp's EE scheduler and IOP services, then connect the overlay loader to the active function table and constructor calls.
-2. **Attempt first boot.** Trace missing functions, unsupported services and failed file reads. Fix the failures revealed by execution and prepare original assets as they become necessary.
+1. **Initialize game services.** Continue through MAIN's disc and IOP module initialization, fixing the failures revealed by execution. Connect gameplay overlay loading to the active function table and constructor calls.
+2. **Trace required data.** Record failed file requests and prepare original assets as they become necessary.
 3. **Validate Windows execution.** Run the diagnostic and boot builds on Windows, checking crashes, dependency loading and paths. Cross-compilation alone does not complete this milestone.
 4. **Bring up the game.** Work through graphics and VU behavior, audio, controls, memory-card saves and gameplay, validating each feature with the original PAL data.
 
@@ -35,16 +35,17 @@ There is no release date yet. Completing translation is one part of the work; ru
 
 - Resident and MAIN overlay code analyzed with the PS2 R5900 Ghidra extension.
 - A static generation probe reports zero unhandled-instruction errors, with unresolved control-flow warnings still remaining.
-- Four representative translated code ranges compiled into Linux x86-64 objects.
+- The resident/MAIN translation compiles and links with the full desktop runtime for Linux x86-64 and Windows x64. A newly discovered resident constructor is translated separately, with the original instruction bytes verified.
 - All nine original driver modules from the supplied PAL IRX.DAT initialized in the minimal IOP probe, creating eight RPC servers. This does not verify audio, controller or memory-card behavior.
+- Continued MAIN execution also loads and starts all nine drivers through the original game's DMA/module-loading path in the full runtime. The next observed stall is in MAIN's memory-bitmap initialization.
 - All four archive indexes parsed: 18,685 files. The supplied OGRE4.CVM yielded all 11 gameplay/minigame overlays; their sizes match the original ELF's overlay slots.
 - All 11 overlays analyzed separately: 10,348 decoded code ranges, 865,866 instructions, zero translation errors and 7,460 unresolved control-flow warnings. This does not establish complete code coverage.
 - A native overlay loader copies original payloads, clears BSS and replaces the prior overlay's dispatch table. Its connection to the full game runtime remains to be implemented.
 - A Linux RAM-only probe loaded all 11 overlays and passed 768 cases across three small translated GAME/HEALTH/UFO routines. Constructors, hardware and full gameplay were not executed by that probe.
-- Linux checks pass: 25 preparation-format tests, overlay swapping/bounds checks and four upstream IOP test programs. The published default tools also passed the Windows/MSVC and Linux GitHub Actions jobs ([initial run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39410019090)). These jobs do not run the original game.
+- Linux checks pass: 26 preparation-format tests, overlay swapping/bounds checks and four upstream IOP test programs. The published default tools and a synthetic full-runtime host also passed Windows/MSVC CI ([run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39412718445)). These jobs do not run the original game.
 - A Windows x64 diagnostic executable cross-builds successfully with LLVM-MinGW. Actual Windows execution remains pending; see [Windows validation](docs/windows-testing.md).
 
-The full-runtime resident/MAIN boot probe now links for Linux and Windows x64. The first Linux boot trace stalled in SDK firmware patch discovery before MAIN; compatibility work is underway. See [boot development](docs/boot-probe.md).
+The Linux boot probe passes the deliberate MAIN-entry checkpoint. Continued execution prints the original initialization messages, reads IRX.DAT and starts its drivers. PAL-specific SDK bindings cover the observed kernel, SIF, file, CD and IOP heap interfaces. Further IOP integration, rendering and gameplay remain in development. See [boot development](docs/boot-probe.md).
 
 The overlay loader and translated routine probe also cross-build for Windows x64. See [overlay research](docs/overlays.md) for the private analysis workflow and its limits.
 

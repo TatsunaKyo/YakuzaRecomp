@@ -6,7 +6,7 @@ Current evidence:
 
 | Check | Result |
 | --- | --- |
-| Native Linux build and 25 Python format tests | Passed |
+| Native Linux build and 26 Python format tests | Passed |
 | Overlay loader swapping, bounds and BSS tests on Linux | Passed |
 | Original 11 overlays loaded into RAM; three translated routines on Linux | 768 cases passed; hardware/constructors/gameplay untested |
 | Four upstream IOP test programs on Linux | Passed |
@@ -14,9 +14,12 @@ Current evidence:
 | LLVM-MinGW cross-build of the diagnostic for Windows x64 | Passed |
 | LLVM-MinGW cross-build of overlay tests and translated routine probe | Passed; execution pending |
 | Windows PE inspection | x86-64 console executable; only Windows system/UCRT DLL imports |
-| Execution on actual Windows | Pending |
+| Original game execution on actual Windows | Pending |
 | GitHub Actions Windows/MSVC default build and tests | Passed for c663375; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39410019090) |
-| Full-runtime resident/MAIN boot-probe cross-link | Passed; first Linux boot stalled in SDK kernel initialization |
+| Full-runtime Windows/MSVC host build and invalid-input execution | Passed with synthetic code; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39412718445) |
+| Full-runtime resident/MAIN boot-probe cross-link | Passed on Linux and Windows x64 |
+| Original PAL loader to verified MAIN entry on Linux | Passed; continued MAIN initialization remains under investigation |
+| Original MAIN disc read, DMA and IOP module-start path on Linux | All nine IRX.DAT drivers started; next graphics initialization stall under investigation |
 | Game boot, rendering, sound, input and gameplay | Pending |
 
 ## Running the Windows diagnostic

@@ -12,17 +12,25 @@ if(NOT MSVC)
 endif()
 find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 set(boot_private "${CMAKE_CURRENT_BINARY_DIR}/boot-private")
+set(YAKUZA_BOOT_SUPPLEMENT_DIR "" CACHE PATH "Private translation of newly decoded boot code")
+set(supplement_args)
+if(YAKUZA_BOOT_SUPPLEMENT_DIR)
+    list(APPEND supplement_args --supplement-dir "${YAKUZA_BOOT_SUPPLEMENT_DIR}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${YAKUZA_BOOT_SUPPLEMENT_DIR}/register_functions.cpp")
+endif()
 file(MAKE_DIRECTORY "${boot_private}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot.py"
     "${YAKUZA_MAIN_GENERATED_DIR}/register_functions.cpp")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot.py"
     --generated-dir "${YAKUZA_MAIN_GENERATED_DIR}" --out-dir "${boot_private}"
+    ${supplement_args}
     COMMAND_ERROR_IS_FATAL ANY)
 file(GLOB boot_generated CONFIGURE_DEPENDS "${YAKUZA_MAIN_GENERATED_DIR}/*.cpp")
 list(REMOVE_ITEM boot_generated "${YAKUZA_MAIN_GENERATED_DIR}/register_functions.cpp")
 add_executable(yakuza_boot_probe tools/boot_probe.cpp src/pal_boot_hooks.cpp
-    "${boot_private}/register_boot.cpp" ${boot_generated})
+    "${boot_private}/register_boot.cpp" "${boot_private}/boot_supplement.cpp" ${boot_generated})
 target_link_libraries(yakuza_boot_probe PRIVATE ps2_runtime yakuza_overlay)
 target_include_directories(yakuza_boot_probe PRIVATE "${YAKUZA_MAIN_GENERATED_DIR}")
 target_precompile_headers(yakuza_boot_probe PRIVATE
@@ -32,8 +40,18 @@ target_precompile_headers(yakuza_boot_probe PRIVATE
 set_target_properties(yakuza_boot_probe PROPERTIES UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE 32)
 # Large generated registration functions and very large guest functions compile
 # separately to keep compiler memory bounded.
-set_source_files_properties("${boot_private}/register_boot.cpp" tools/boot_probe.cpp src/pal_boot_hooks.cpp
+set_source_files_properties("${boot_private}/register_boot.cpp" "${boot_private}/boot_supplement.cpp"
+    tools/boot_probe.cpp src/pal_boot_hooks.cpp
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+set_source_files_properties("${boot_private}/boot_supplement.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+if(YAKUZA_BOOT_SUPPLEMENT_DIR)
+    file(GLOB supplement_sources CONFIGURE_DEPENDS "${YAKUZA_BOOT_SUPPLEMENT_DIR}/*.cpp")
+    list(REMOVE_ITEM supplement_sources "${YAKUZA_BOOT_SUPPLEMENT_DIR}/register_functions.cpp")
+    target_sources(yakuza_boot_probe PRIVATE ${supplement_sources})
+    set_source_files_properties(${supplement_sources} PROPERTIES
+        SKIP_PRECOMPILE_HEADERS ON SKIP_UNITY_BUILD_INCLUSION ON
+        INCLUDE_DIRECTORIES "${YAKUZA_BOOT_SUPPLEMENT_DIR}")
+endif()
 foreach(source IN LISTS boot_generated)
     file(SIZE "${source}" source_size)
     if(source_size GREATER 524288)

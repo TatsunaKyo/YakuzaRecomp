@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--seconds", type=int, default=15)
     parser.add_argument("--xvfb", type=Path)
+    parser.add_argument("--continue-main", action="store_true")
     args = parser.parse_args()
     require(1 <= args.seconds <= 120 and args.exe.is_file(), "Invalid time limit or missing executable")
     require(not args.out_dir.resolve().is_relative_to(Path(__file__).resolve().parents[1]),
@@ -33,6 +34,7 @@ def main():
     server = None
     result = {"exit_code": None, "timed_out": False, "reached_main": False,
               "platform": os.name, "time_limit_seconds": args.seconds}
+    result["continue_main"] = args.continue_main
     digest = hashlib.sha256()
     with args.exe.open("rb") as binary:
         while chunk := binary.read(1024 * 1024): digest.update(chunk)
@@ -55,24 +57,28 @@ def main():
                 env["DISPLAY"] = ":" + display
                 env["LIBGL_ALWAYS_SOFTWARE"] = "1"
                 env["XDG_CACHE_HOME"] = str(args.out_dir.resolve() / "cache")
+                env["XDG_CONFIG_HOME"] = str(args.out_dir.resolve() / "config")
             finally:
                 os.close(read_fd)
                 if write_fd >= 0: os.close(write_fd)
         with (args.out_dir / "boot.log").open("x") as output:
             try:
-                run = subprocess.run([str(args.exe.resolve()), str(args.disc_dir.resolve()), str(args.seconds),
-                    str(args.out_dir.resolve() / "state")],
+                command = [str(args.exe.resolve()), str(args.disc_dir.resolve()), str(args.seconds),
+                           str(args.out_dir.resolve() / "state")]
+                if args.continue_main: command.append("continue")
+                run = subprocess.run(command,
                     stdout=output, stderr=subprocess.STDOUT, env=env, timeout=args.seconds + 20)
                 result["exit_code"] = run.returncode
             except subprocess.TimeoutExpired:
                 result["timed_out"] = True
         log = (args.out_dir / "boot.log").read_text(errors="replace")
         result["firmware_patch_hook_calls"] = log.count("[yakuza-kernel]")
-        result["reached_main"] = result["exit_code"] == 0 and "reached_main=1" in log
+        result["executed_iop_modules"] = log.count("[yakuza-iop] executed transferred module ")
+        result["reached_main"] = "verified original MAIN payload at entry 0x22cc40" in log
         (args.out_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n")
         print(json.dumps(result, indent=2))
         print("Trace:", args.out_dir / "boot.log")
-        return 0 if result["reached_main"] else 1
+        return 0 if result["reached_main"] and result["exit_code"] == 0 else 1
     finally:
         if server is not None:
             server.terminate()

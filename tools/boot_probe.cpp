@@ -17,6 +17,38 @@
 
 namespace {
 std::atomic<bool> reached_main{false}, finished{false};
+bool continue_main = false;
+PS2Runtime::RecompiledFunction original_main = nullptr;
+PS2Runtime::RecompiledFunction original_bitmap_free = nullptr;
+PS2Runtime::RecompiledFunction original_graphics_init = nullptr, original_graphics_alloc = nullptr;
+void trace_graphics_alloc(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
+    static unsigned count = 0;
+    const bool log = count++ < 8;
+    if (log)
+        std::cout << "[yakuza-trace] graphics allocation size=0x" << std::hex << GPR_U32(ctx, 4)
+                  << " allocator=0x" << Ps2FastRead32(memory, GPR_U32(ctx, 28) - 0x7fa8)
+                  << " ra=0x" << GPR_U32(ctx, 31) << std::dec << '\n';
+    original_graphics_alloc(memory, ctx, runtime);
+    if (log)
+        std::cout << "[yakuza-trace] graphics allocation returned v0=0x" << std::hex
+                  << GPR_U32(ctx, 2) << " pc=0x" << ctx->pc << std::dec << '\n';
+}
+void trace_graphics_init(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
+    const uint32_t object = GPR_U32(ctx, 4);
+    std::cout << "[yakuza-trace] graphics init object=0x" << std::hex << object
+              << " parameters=0x" << GPR_U32(ctx, 5) << std::dec << '\n';
+    original_graphics_init(memory, ctx, runtime);
+    std::cout << "[yakuza-trace] graphics init yielded pc=0x" << std::hex << ctx->pc
+              << " table=0x" << Ps2FastRead32(memory, object + 0x100) << std::dec << '\n';
+}
+void trace_bitmap_free(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
+    static unsigned count = 0;
+    if (count++ < 16)
+        std::cout << "[yakuza-trace] bitmap release a0=0x" << std::hex << GPR_U32(ctx, 4)
+                  << " a1=0x" << GPR_U32(ctx, 5) << " a2=0x" << GPR_U32(ctx, 6)
+                  << " gp=0x" << GPR_U32(ctx, 28) << " ra=0x" << GPR_U32(ctx, 31) << std::dec << '\n';
+    original_bitmap_free(memory, ctx, runtime);
+}
 void verify_input(const std::filesystem::path& path, uint64_t length, uint64_t expected) {
     if (std::filesystem::file_size(path) != length) throw std::runtime_error("Unsupported PAL input size");
     std::ifstream input(path, std::ios::binary);
@@ -25,9 +57,18 @@ void verify_input(const std::filesystem::path& path, uint64_t length, uint64_t e
     while (input.get(byte)) fingerprint = (fingerprint ^ static_cast<uint8_t>(byte)) * 0x100000001b3ULL;
     if (!input.eof() || fingerprint != expected) throw std::runtime_error("Input differs from the supported PAL build");
 }
-void main_entry(uint8_t*, R5900Context* ctx, PS2Runtime* runtime) {
+void main_entry(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
+    uint64_t code = 0xcbf29ce484222325ULL;
+    for (uint32_t i = 0; i < 3026720; ++i) code = (code ^ memory[0x167c40 + i]) * 0x100000001b3ULL;
+    if (Ps2FastRead32(memory, 0x167c00) != 0x336f574d || code != 0xcf4017352c7cb639ULL)
+        throw std::runtime_error("MAIN entry reached without the verified original code loaded into RAM");
     reached_main.store(true);
-    std::cout << "[yakuza-boot] reached original MAIN entry 0x22cc40; stopping at milestone\n" << std::flush;
+    std::cout << "[yakuza-boot] verified original MAIN payload at entry 0x22cc40\n" << std::flush;
+    if (continue_main) {
+        original_main(memory, ctx, runtime);
+        return;
+    }
+    std::cout << "[yakuza-boot] stopping at first-boot milestone\n";
     runtime->requestStop();
     ctx->pc = 0x22cc40;
 }
@@ -45,7 +86,22 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
     paths.mcRoot = std::filesystem::absolute(state / "mc0");
     PS2Runtime::setIoPaths(paths);
     yakuza::install_pal_kernel_hooks(runtime);
+    yakuza::install_pal_sdk_hooks(runtime);
+    yakuza::install_boot_supplement(runtime);
+    original_main = runtime.lookupFunction(0x22cc40);
+    if (!original_main) throw std::runtime_error("Missing original MAIN entry in the generated dispatch map");
     if (!runtime.replaceFunction(0x22cc40, main_entry)) throw std::runtime_error("MAIN entry is outside dispatch table");
+    if (continue_main) {
+        original_bitmap_free = runtime.lookupFunction(0x19b090);
+        if (!original_bitmap_free || !runtime.replaceFunction(0x19b090, trace_bitmap_free))
+            throw std::runtime_error("Missing PAL bitmap-release trace entry");
+        original_graphics_init = runtime.lookupFunction(0x18cd80);
+        original_graphics_alloc = runtime.lookupFunction(0x1aaa10);
+        if (!original_graphics_init || !original_graphics_alloc ||
+            !runtime.replaceFunction(0x18cd80, trace_graphics_init) ||
+            !runtime.replaceFunction(0x1aaa10, trace_graphics_alloc))
+            throw std::runtime_error("Missing PAL graphics initialization trace entries");
+    }
     std::thread watchdog([&] {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
         while (!finished.load() && std::chrono::steady_clock::now() < deadline)
@@ -60,7 +116,14 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
     finished.store(true); watchdog.join();
     std::cout << "[yakuza-boot] final PC=0x" << std::hex << runtime.cpu().pc << std::dec
               << " reached_main=" << reached_main.load() << '\n';
-    return reached_main.load() ? 0 : 1;
+    if (continue_main) {
+        for (unsigned reg = 1; reg < 32; ++reg)
+            std::cout << "[yakuza-register] r" << reg << "=0x" << std::hex
+                      << GPR_U64((&runtime.cpu()), reg) << std::dec << '\n';
+    }
+    // Continued exploration has no success end condition yet. Keep failures or
+    // time limits distinct from the deliberate successful MAIN checkpoint.
+    return reached_main.load() && !continue_main ? 0 : 1;
 }
 } // namespace
 #ifdef _WIN32
@@ -69,14 +132,19 @@ int wmain(int argc, wchar_t** argv) {
 #else
 int main(int argc, char** argv) {
 #endif
-    if (argc < 2 || argc > 4) {
-        std::cerr << "Usage: yakuza_boot_probe <original PAL disc folder> [max seconds, 1..120] [state folder]\n";
+    std::cout << std::unitbuf;
+    if (argc < 2 || argc > 5) {
+        std::cerr << "Usage: yakuza_boot_probe <original PAL disc folder> [max seconds, 1..120] [state folder] [continue]\n";
         return 2;
     }
     try {
         unsigned seconds = argc >= 3 ? static_cast<unsigned>(std::stoul(argv[2])) : 15;
         if (!seconds || seconds > 120) throw std::runtime_error("Time limit must be 1..120 seconds");
-        auto state = argc == 4 ? std::filesystem::path(argv[3]) : std::filesystem::current_path() / ".yakuza-boot-state";
+        auto state = argc >= 4 ? std::filesystem::path(argv[3]) : std::filesystem::current_path() / ".yakuza-boot-state";
+        if (argc == 5) {
+            if (std::filesystem::path(argv[4]) != "continue") throw std::runtime_error("Unknown boot mode");
+            continue_main = true;
+        }
         return run(std::filesystem::path(argv[1]), seconds, state);
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 2; }
 }

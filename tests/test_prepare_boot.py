@@ -6,6 +6,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from prepare_boot import extend_table
 from prepare_game import FormatError
+from prepare_boot_supplement import subtract
 
 FIXTURE = """extern const uint32_t g_ps2RecompiledFunctionTableBase = 0x100008u;
 extern const uint32_t g_ps2RecompiledFunctionTableEnd = 0x5918a4u;
@@ -34,6 +35,12 @@ class BootTableTests(unittest.TestCase):
                     FIXTURE.replace("Table[1197607u] = {};", "Table[];"),
                     FIXTURE + FIXTURE):
             with self.subTest(text=bad[:40]), self.assertRaises(FormatError): extend_table(bad)
+
+    def test_supplement_extracts_only_new_instruction_intervals(self):
+        self.assertEqual(subtract([(4, 24)], [(8, 12), (16, 20)]), [(4, 8), (12, 16), (20, 24)])
+        self.assertEqual(subtract([(8, 20)], [(4, 24)]), [])
+        self.assertEqual(subtract([(4, 12), (16, 24)], [(4, 8), (8, 12), (16, 24)]), [])
+        self.assertEqual(subtract([(4, 8)], [(12, 16)]), [(4, 8)])
 
 
 if __name__ == "__main__": unittest.main()

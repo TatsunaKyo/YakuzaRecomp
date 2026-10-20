@@ -5,6 +5,7 @@ No game code is embedded here. The original registrations stay intact, and empty
 overlay slots remain unresolved until real overlay integration supplies them.
 """
 import argparse
+import json
 from pathlib import Path
 import re
 
@@ -34,6 +35,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--generated-dir", required=True, type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
+    parser.add_argument("--supplement-dir", type=Path)
     args = parser.parse_args()
     require(not args.out_dir.resolve().is_relative_to(Path(__file__).resolve().parents[1]),
             "Keep generated game code outside the checkout")
@@ -41,6 +43,32 @@ def main():
     args.out_dir.mkdir(parents=True, exist_ok=True)
     path = args.out_dir / "register_boot.cpp"
     if not path.exists() or path.read_text() != text: path.write_text(text)
+    supplement = '#include "ps2_runtime.h"\n#include <stdexcept>\n'
+    if args.supplement_dir:
+        folder = args.supplement_dir.resolve()
+        require((folder / "register_functions.cpp").is_file(), "Missing supplemental registration")
+        supplement += '#include ' + json.dumps((folder / "ps2_recompiled_functions.h").as_posix()) + '\n'
+        for name in ("Base", "End", "SlotCount", ""):
+            supplement += f'#define g_ps2RecompiledFunctionTable{name} g_yakuzaSupplementTable{name}\n'
+        supplement += '#include ' + json.dumps((folder / "register_functions.cpp").as_posix()) + '\n'
+        for name in ("Base", "End", "SlotCount", ""):
+            supplement += f'#undef g_ps2RecompiledFunctionTable{name}\n'
+        supplement += '''namespace yakuza {
+void install_boot_supplement(PS2Runtime& runtime) {
+    for (uint32_t i = 0; i < g_yakuzaSupplementTableSlotCount; ++i) {
+        auto function = g_yakuzaSupplementTable[i];
+        if (!function) continue;
+        uint32_t address = g_yakuzaSupplementTableBase + i * 4;
+        if (runtime.hasFunction(address) || !runtime.replaceFunction(address, function))
+            throw std::runtime_error("Supplement conflicts with the original dispatch map");
+    }
+}
+}
+'''
+    else:
+        supplement += 'namespace yakuza { void install_boot_supplement(PS2Runtime&) {} }\n'
+    path = args.out_dir / "boot_supplement.cpp"
+    if not path.exists() or path.read_text() != supplement: path.write_text(supplement)
     print("Prepared PAL boot registration; unpopulated overlays remain missing")
 
 
