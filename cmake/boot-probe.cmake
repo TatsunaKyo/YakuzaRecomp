@@ -11,6 +11,27 @@ if(NOT MSVC)
     target_compile_options(ps2_runtime PUBLIC -msse4.1)
 endif()
 find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+set(runtime_private "${CMAKE_CURRENT_BINARY_DIR}/runtime-private")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/pal-runtime-layout.json")
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
+    --runtime-dir "${ps2recomp_SOURCE_DIR}/ps2xRuntime" --out-dir "${runtime_private}"
+    COMMAND_ERROR_IS_FATAL ANY)
+get_target_property(runtime_sources ps2_runtime SOURCES)
+set(adapted_sources)
+foreach(source IN LISTS runtime_sources)
+    cmake_path(ABSOLUTE_PATH source BASE_DIRECTORY "${ps2recomp_SOURCE_DIR}/ps2xRuntime" OUTPUT_VARIABLE absolute_source)
+    cmake_path(IS_PREFIX ps2recomp_SOURCE_DIR "${absolute_source}" NORMALIZE in_dependency)
+    if(in_dependency AND absolute_source MATCHES "/ps2xRuntime/src/lib/(.+)$")
+        list(APPEND adapted_sources "${runtime_private}/src/lib/${CMAKE_MATCH_1}")
+    else()
+        list(APPEND adapted_sources "${source}")
+    endif()
+endforeach()
+set_property(TARGET ps2_runtime PROPERTY SOURCES "${adapted_sources}")
+target_include_directories(ps2_runtime BEFORE PRIVATE
+    "${runtime_private}/src/lib/Kernel" "${runtime_private}/src/lib")
 set(boot_private "${CMAKE_CURRENT_BINARY_DIR}/boot-private")
 set(YAKUZA_BOOT_SUPPLEMENT_DIR "" CACHE PATH "Private translation of newly decoded boot code")
 set(supplement_args)
@@ -33,6 +54,9 @@ add_executable(yakuza_boot_probe tools/boot_probe.cpp src/pal_boot_hooks.cpp
     "${boot_private}/register_boot.cpp" "${boot_private}/boot_supplement.cpp" ${boot_generated})
 target_link_libraries(yakuza_boot_probe PRIVATE ps2_runtime yakuza_overlay)
 target_include_directories(yakuza_boot_probe PRIVATE "${YAKUZA_MAIN_GENERATED_DIR}")
+# Per-source include keeps the translated-code PCH independent of native layout.
+set_source_files_properties(tools/boot_probe.cpp src/pal_boot_hooks.cpp PROPERTIES
+    INCLUDE_DIRECTORIES "${runtime_private}")
 target_precompile_headers(yakuza_boot_probe PRIVATE
     "${ps2recomp_SOURCE_DIR}/ps2xRuntime/include/ps2_runtime_macros.h"
     "${YAKUZA_MAIN_GENERATED_DIR}/ps2_recompiled_functions.h"

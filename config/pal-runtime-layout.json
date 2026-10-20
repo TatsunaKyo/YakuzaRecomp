@@ -1,0 +1,9 @@
+{
+  "rpc_packets": {"start": 524288, "end": 589824},
+  "rpc_servers": {"start": 589824, "end": 655360},
+  "tls": {"start": 655360, "end": 720896},
+  "boot_mode": {"start": 720896, "end": 724992},
+  "native_heap": {"start": 737280, "end": 851968},
+  "callback_stacks": {"start": 851968, "end": 1048576},
+  "game_heap_end": 33423360
+}

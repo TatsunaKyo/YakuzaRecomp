@@ -29,6 +29,8 @@ The original loader now reads MAIN.BIN and reaches its entry point in the Linux 
 
 The supplied files are sufficient for the current analysis and diagnostic checks. OGRE.CVM, OGRE2.CVM and OGRE3.CVM contain further assets that will be needed for game boot and play testing. Specific required files should be identified from runtime failures before requesting more uploads.
 
+**Next required input:** the continued PAL boot now requests `PAL_NTSC.DAT` from the disc root. Its lookup fails in the current cloud input folder. Supply that original file to investigate the next boot stage; it is not included in this repository.
+
 There is no release date yet. Completing translation is one part of the work; runtime behavior and game compatibility still need substantial development.
 
 ## Current evidence
@@ -37,12 +39,12 @@ There is no release date yet. Completing translation is one part of the work; ru
 - A static generation probe reports zero unhandled-instruction errors, with unresolved control-flow warnings still remaining.
 - The resident/MAIN translation compiles and links with the full desktop runtime for Linux x86-64 and Windows x64. A newly discovered resident constructor is translated separately, with the original instruction bytes verified.
 - All nine original driver modules from the supplied PAL IRX.DAT initialized in the minimal IOP probe, creating eight RPC servers. This does not verify audio, controller or memory-card behavior.
-- Continued MAIN execution also loads and starts all nine drivers through the original game's DMA/module-loading path in the full runtime. The next observed stall is in MAIN's memory-bitmap initialization.
+- Continued MAIN execution also loads and starts all nine drivers through the original game's DMA/module-loading path in the full runtime. After a native memory-layout correction, the graphics allocation succeeds and execution reaches PAL display-mode setup. Additional graphics code coverage remains under investigation.
 - All four archive indexes parsed: 18,685 files. The supplied OGRE4.CVM yielded all 11 gameplay/minigame overlays; their sizes match the original ELF's overlay slots.
 - All 11 overlays analyzed separately: 10,348 decoded code ranges, 865,866 instructions, zero translation errors and 7,460 unresolved control-flow warnings. This does not establish complete code coverage.
 - A native overlay loader copies original payloads, clears BSS and replaces the prior overlay's dispatch table. Its connection to the full game runtime remains to be implemented.
 - A Linux RAM-only probe loaded all 11 overlays and passed 768 cases across three small translated GAME/HEALTH/UFO routines. Constructors, hardware and full gameplay were not executed by that probe.
-- Linux checks pass: 26 preparation-format tests, overlay swapping/bounds checks and four upstream IOP test programs. The published default tools and a synthetic full-runtime host also passed Windows/MSVC CI ([run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39412718445)). These jobs do not run the original game.
+- Linux checks pass: 27 preparation-format tests, overlay swapping/bounds checks and four upstream IOP test programs. The published default tools and a synthetic full-runtime host also passed Windows/MSVC CI ([run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39456097559)). These jobs do not run the original game.
 - A Windows x64 diagnostic executable cross-builds successfully with LLVM-MinGW. Actual Windows execution remains pending; see [Windows validation](docs/windows-testing.md).
 
 The Linux boot probe passes the deliberate MAIN-entry checkpoint. Continued execution prints the original initialization messages, reads IRX.DAT and starts its drivers. PAL-specific SDK bindings cover the observed kernel, SIF, file, CD and IOP heap interfaces. Further IOP integration, rendering and gameplay remain in development. See [boot development](docs/boot-probe.md).
@@ -92,7 +94,7 @@ ctest --test-dir out/linux --output-on-failure
 out/linux/yakuza_iop_probe /path/to/IRX.DAT
 ```
 
-PS2Recomp is pinned to eb8688b2fd191129f103a39543002c005b33409c. The public API is used without modifying its source. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream sources and licenses.
+PS2Recomp is pinned to eb8688b2fd191129f103a39543002c005b33409c. Its checkout stays unchanged; the opt-in boot target applies documented PAL memory-layout adaptations to private build copies. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream sources and licenses.
 
 ## License
 

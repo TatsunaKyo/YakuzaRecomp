@@ -3,6 +3,7 @@
 #include "ps2_runtime_macros.h"
 #include "ps2_stubs.h"
 #include "ps2_syscalls.h"
+#include "pal_runtime_layout.h"
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
@@ -114,16 +115,20 @@ void sdk_service(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
         std::cout << "[yakuza-sdk] native SDK service for 0x" << std::hex << context->pc
                   << " a0=0x" << GPR_U32(context, 4) << " a1=0x" << GPR_U32(context, 5) << std::dec << '\n';
     if constexpr (Handler == ps2_syscalls::fioOpen || Handler == ps2_stubs::sceCdSearchFile) {
-        if constexpr (Handler == ps2_stubs::sceCdSearchFile) {
-            if (GPR_U32(context, 6) != 0)
-                throw std::runtime_error("The PAL development disc mount supports only layer zero");
-        }
         const unsigned path_register = Handler == ps2_syscalls::fioOpen ? 4 : 5;
         const uint32_t address = GPR_U32(context, path_register) & PS2_RAM_MASK;
         std::string path;
         for (uint32_t i = address; i < PS2_RAM_SIZE && i - address < 512 && memory[i]; ++i)
             path += static_cast<char>(memory[i]);
         std::cout << "[yakuza-file] " << (Handler == ps2_syscalls::fioOpen ? "open " : "search ") << path << '\n';
+        if constexpr (Handler == ps2_stubs::sceCdSearchFile) {
+            if (GPR_U32(context, 6) != 0) {
+                std::cout << "[yakuza-file] requested disc layer is not mounted\n";
+                SET_GPR_S32(context, 2, 0); // SDK search failure; allow the original fallback handling.
+                context->pc = GPR_U32(context, 31);
+                return;
+            }
+        }
     }
     // Match the upstream generated HLE wrappers. A handler that transfers to
     // the scheduler must resume at the original caller, not inside SDK code.
@@ -137,6 +142,9 @@ void init_rpc(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
 void init_heap(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
     ps2_stubs::sceSifInitIopHeap(memory, context, runtime);
     if (GPR_S32(context, 2) == 0) Ps2FastWrite32(memory, 0x1323f0, 0);
+}
+void end_of_heap(uint8_t*, R5900Context* context, PS2Runtime*) {
+    SET_GPR_U32(context, 2, pal_memory::game_heap_end);
 }
 void debug_console(uint8_t* memory, R5900Context* context, PS2Runtime*) {
     // The PAL SDK's DECI2 console blocks awaiting a physical debug interface.
@@ -213,6 +221,7 @@ void install_pal_sdk_hooks(PS2Runtime& runtime) {
         {0x116b08u, sdk_service<ps2_stubs::sceCdGetError>},
         {0x105560u, sdk_service<set_dma>},
         {0x10db68u, sdk_service<exec_iop_buffer>},
+        {0x105180u, sdk_service<end_of_heap>},
     };
     for (const auto& [address, handler] : services) {
         if (!runtime.hasFunction(address) || !runtime.replaceFunction(address, handler))

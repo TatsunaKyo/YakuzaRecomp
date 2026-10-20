@@ -4,6 +4,7 @@
 #include "ps2_runtime_macros.h"
 #include "ps2_recompiled_functions.h"
 #include "yakuza/pal_boot_hooks.h"
+#include "pal_runtime_layout.h"
 #include <atomic>
 #include <chrono>
 #include <filesystem>
@@ -19,36 +20,6 @@ namespace {
 std::atomic<bool> reached_main{false}, finished{false};
 bool continue_main = false;
 PS2Runtime::RecompiledFunction original_main = nullptr;
-PS2Runtime::RecompiledFunction original_bitmap_free = nullptr;
-PS2Runtime::RecompiledFunction original_graphics_init = nullptr, original_graphics_alloc = nullptr;
-void trace_graphics_alloc(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
-    static unsigned count = 0;
-    const bool log = count++ < 8;
-    if (log)
-        std::cout << "[yakuza-trace] graphics allocation size=0x" << std::hex << GPR_U32(ctx, 4)
-                  << " allocator=0x" << Ps2FastRead32(memory, GPR_U32(ctx, 28) - 0x7fa8)
-                  << " ra=0x" << GPR_U32(ctx, 31) << std::dec << '\n';
-    original_graphics_alloc(memory, ctx, runtime);
-    if (log)
-        std::cout << "[yakuza-trace] graphics allocation returned v0=0x" << std::hex
-                  << GPR_U32(ctx, 2) << " pc=0x" << ctx->pc << std::dec << '\n';
-}
-void trace_graphics_init(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
-    const uint32_t object = GPR_U32(ctx, 4);
-    std::cout << "[yakuza-trace] graphics init object=0x" << std::hex << object
-              << " parameters=0x" << GPR_U32(ctx, 5) << std::dec << '\n';
-    original_graphics_init(memory, ctx, runtime);
-    std::cout << "[yakuza-trace] graphics init yielded pc=0x" << std::hex << ctx->pc
-              << " table=0x" << Ps2FastRead32(memory, object + 0x100) << std::dec << '\n';
-}
-void trace_bitmap_free(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
-    static unsigned count = 0;
-    if (count++ < 16)
-        std::cout << "[yakuza-trace] bitmap release a0=0x" << std::hex << GPR_U32(ctx, 4)
-                  << " a1=0x" << GPR_U32(ctx, 5) << " a2=0x" << GPR_U32(ctx, 6)
-                  << " gp=0x" << GPR_U32(ctx, 28) << " ra=0x" << GPR_U32(ctx, 31) << std::dec << '\n';
-    original_bitmap_free(memory, ctx, runtime);
-}
 void verify_input(const std::filesystem::path& path, uint64_t length, uint64_t expected) {
     if (std::filesystem::file_size(path) != length) throw std::runtime_error("Unsupported PAL input size");
     std::ifstream input(path, std::ios::binary);
@@ -62,6 +33,9 @@ void main_entry(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
     for (uint32_t i = 0; i < 3026720; ++i) code = (code ^ memory[0x167c40 + i]) * 0x100000001b3ULL;
     if (Ps2FastRead32(memory, 0x167c00) != 0x336f574d || code != 0xcf4017352c7cb639ULL)
         throw std::runtime_error("MAIN entry reached without the verified original code loaded into RAM");
+    if (runtime->guestHeapEnd() != runtime->guestHeapBase())
+        throw std::runtime_error("Native helper allocations exist before the PAL MAIN heap handoff");
+    runtime->configureGuestHeap(yakuza::pal_memory::native_heap_start, yakuza::pal_memory::native_heap_end);
     reached_main.store(true);
     std::cout << "[yakuza-boot] verified original MAIN payload at entry 0x22cc40\n" << std::flush;
     if (continue_main) {
@@ -91,17 +65,6 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
     original_main = runtime.lookupFunction(0x22cc40);
     if (!original_main) throw std::runtime_error("Missing original MAIN entry in the generated dispatch map");
     if (!runtime.replaceFunction(0x22cc40, main_entry)) throw std::runtime_error("MAIN entry is outside dispatch table");
-    if (continue_main) {
-        original_bitmap_free = runtime.lookupFunction(0x19b090);
-        if (!original_bitmap_free || !runtime.replaceFunction(0x19b090, trace_bitmap_free))
-            throw std::runtime_error("Missing PAL bitmap-release trace entry");
-        original_graphics_init = runtime.lookupFunction(0x18cd80);
-        original_graphics_alloc = runtime.lookupFunction(0x1aaa10);
-        if (!original_graphics_init || !original_graphics_alloc ||
-            !runtime.replaceFunction(0x18cd80, trace_graphics_init) ||
-            !runtime.replaceFunction(0x1aaa10, trace_graphics_alloc))
-            throw std::runtime_error("Missing PAL graphics initialization trace entries");
-    }
     std::thread watchdog([&] {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
         while (!finished.load() && std::chrono::steady_clock::now() < deadline)

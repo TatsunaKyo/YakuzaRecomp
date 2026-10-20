@@ -12,7 +12,7 @@ With Visual Studio 2022's C++ workload, Git, Python 3.10+ and CMake installed, u
 cmake -S . -B "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" -A x64 `
   -DYAKUZA_BUILD_BOOT_PROBE=ON `
   -DYAKUZA_MAIN_GENERATED_DIR="D:\Yakuza Research\generated-pal-probe" `
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v2\generated" `
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v4\generated" `
   -DPS2X_ENABLE_FFMPEG=OFF
 cmake --build "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" --config Debug --parallel 2 --target yakuza_boot_probe
 & "$env:LOCALAPPDATA\YakuzaRecomp\boot-build\Debug\yakuza_boot_probe.exe" "D:\Yakuza PAL" 15 "$env:LOCALAPPDATA\YakuzaRecomp\boot-state"
@@ -38,7 +38,7 @@ cmake -S . -B /workspace/scratch/yakuza-pal/boot-build -G Ninja \
   -DCMAKE_PREFIX_PATH=/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr \
   -DYAKUZA_BUILD_BOOT_PROBE=ON \
   -DYAKUZA_MAIN_GENERATED_DIR=/workspace/scratch/yakuza-pal/generated-pal-probe \
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v2/generated
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v4/generated
 cmake --build /workspace/scratch/yakuza-pal/boot-build --target yakuza_boot_probe --parallel 2
 python tools/run_boot_probe.py \
   --exe /workspace/scratch/yakuza-pal/boot-build/yakuza_boot_probe \
@@ -50,7 +50,7 @@ python tools/run_boot_probe.py \
 
 Choose a fresh output directory for each run. The runner preserves the executable digest, original input hashes, exit status and trace. Its outer timeout can kill a stuck process if the runtime's cooperative stop fails. The temporary display is shut down afterward. The native run may report no available audio device in the cloud; this does not test sound output. Save-state paths are separate from the original disc files.
 
-Add `--continue-main` to the Python command to continue into MAIN. This mode also records register values at shutdown and traces the initialization routine currently under investigation.
+Add `--continue-main` to the Python command to continue into MAIN. This mode also records register values at shutdown. The supplied inputs currently reach a failed lookup of `PAL_NTSC.DAT` in the disc root; supply that original PAL file before continuing dependent boot investigation. Missing second-layer probes return the normal SDK search-failure result.
 
 ## Native kernel compatibility
 
@@ -72,7 +72,28 @@ The module-start bridge retains the original EE-to-IOP DMA operation. Before exe
 
 The first constructor pass revealed a missing entry at `0x0013a2a0`. Its address comes from the original resident constructor table at `0x0013a304`. [SeedResidentCtor.java](../tools/ghidra/SeedResidentCtor.java) checks that pointer before changing Ghidra analysis metadata. It preserves all original bytes.
 
-[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image, rejects removed baseline coverage, and selects only newly decoded intervals. The current supplement contains 22 original instructions in one range, with zero translation errors. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings.
+[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The current v4 supplement translates 123 instructions in four ranges: the resident constructor, a graphics method and an observed callback with its tail body. Generation reports zero errors and two unresolved indirect-control-flow warnings. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings.
+
+The graphics method at `0x0018fda0` is referenced by the original vtable word at `0x0013a914`. Its bytes were already decoded at the end of another chunk, but had no callable registration. [SeedGraphicsEntry.java](../tools/ghidra/SeedGraphicsEntry.java) checks the vtable pointer before classifying the function. The supplemental generator's `--entry 0x18fda0` preserves that newly identified entry even though no new instruction bytes were discovered. It does not replace the original method's return value with an invented result.
+
+[SeedObservedEntry.java](../tools/ghidra/SeedObservedEntry.java) handles additional indirect entries observed in verified boot traces. It checks the original first instruction before changing analysis metadata and rejects conflicts with classified functions. The current callback at `0x0017eb40` came from a runtime JALR target. Its original code now executes and reaches the next missing disc-file request.
+
+## PAL native memory layout
+
+The default runtime reserves the top 1 MiB of EE RAM for helpers. MAIN's original allocator then fails a 0x3c3500-byte graphics allocation. Its subsequent cleanup reads an invalid slot and loops. Returning the original PAL heap boundary, 0x1fe0000 below the 128 KiB main stack, makes that allocation succeed and reaches the original PAL display-mode setup call.
+
+[prepare_runtime.py](../tools/prepare_runtime.py) verifies the exact source digests of the two adapted upstream files and creates private build copies. The source checkout stays intact. [pal-runtime-layout.json](../config/pal-runtime-layout.json) defines disjoint low-memory regions above the native kernel mirrors and below the resident executable at 0x100000:
+
+| Native region | Start | End (exclusive) |
+| --- | --- | --- |
+| RPC packets | 0x80000 | 0x90000 |
+| RPC servers | 0x90000 | 0xa0000 |
+| TLS | 0xa0000 | 0xb0000 |
+| Boot metadata | 0xb0000 | 0xb1000 |
+| Helper heap | 0xb4000 | 0xd0000 |
+| Callback stacks | 0xd0000 | 0x100000 |
+
+The generator rejects overlapping regions. MAIN entry configures the separate helper heap only after checking that no prior native heap allocation exists. The original game allocator keeps its own heap. This avoids placing native RPC descriptors or callback stacks inside game allocations; it is a PAL-specific development layout, not an upstream compatibility claim for other games.
 
 ## Public CI
 

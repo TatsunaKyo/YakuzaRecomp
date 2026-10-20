@@ -6,7 +6,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from prepare_boot import extend_table
 from prepare_game import FormatError
-from prepare_boot_supplement import subtract
+from prepare_boot_supplement import subtract, supplement_ranges
 
 FIXTURE = """extern const uint32_t g_ps2RecompiledFunctionTableBase = 0x100008u;
 extern const uint32_t g_ps2RecompiledFunctionTableEnd = 0x5918a4u;
@@ -41,6 +41,13 @@ class BootTableTests(unittest.TestCase):
         self.assertEqual(subtract([(8, 20)], [(4, 24)]), [])
         self.assertEqual(subtract([(4, 12), (16, 24)], [(4, 8), (8, 12), (16, 24)]), [])
         self.assertEqual(subtract([(4, 8)], [(12, 16)]), [(4, 8)])
+
+    def test_identified_entry_inside_previously_decoded_bytes_is_preserved(self):
+        # A vtable entry can split an old decoded chunk without adding bytes.
+        # Instruction subtraction alone would silently omit the new function.
+        updated, baseline = [(4, 16), (16, 28), (32, 40)], [(4, 28)]
+        self.assertEqual(supplement_ranges(updated, baseline, [16, 16]), [(16, 28), (32, 40)])
+        with self.assertRaises(FormatError): supplement_ranges(updated, baseline, [20])
 
 
 if __name__ == "__main__": unittest.main()

@@ -6,7 +6,7 @@ Current evidence:
 
 | Check | Result |
 | --- | --- |
-| Native Linux build and 26 Python format tests | Passed |
+| Native Linux build and 27 Python format tests | Passed |
 | Overlay loader swapping, bounds and BSS tests on Linux | Passed |
 | Original 11 overlays loaded into RAM; three translated routines on Linux | 768 cases passed; hardware/constructors/gameplay untested |
 | Four upstream IOP test programs on Linux | Passed |
@@ -19,7 +19,8 @@ Current evidence:
 | Full-runtime Windows/MSVC host build and invalid-input execution | Passed with synthetic code; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39412718445) |
 | Full-runtime resident/MAIN boot-probe cross-link | Passed on Linux and Windows x64 |
 | Original PAL loader to verified MAIN entry on Linux | Passed; continued MAIN initialization remains under investigation |
-| Original MAIN disc read, DMA and IOP module-start path on Linux | All nine IRX.DAT drivers started; next graphics initialization stall under investigation |
+| Original MAIN disc read, DMA and IOP module-start path on Linux | All nine IRX.DAT drivers started |
+| PAL graphics allocation and display-mode setup call on Linux | Reached after correcting the native helper memory layout; rendering remains unverified |
 | Game boot, rendering, sound, input and gameplay | Pending |
 
 ## Running the Windows diagnostic

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify an updated decoded map and translate only newly discovered code."""
+"""Verify an updated decoded map and translate new code or newly identified entries."""
 import argparse
 import bisect
 import csv
@@ -39,10 +39,22 @@ def subtract(ranges, covered):
     return result
 
 
+def supplement_ranges(ranges, covered, entries):
+    extra = subtract(ranges, covered)
+    for entry in entries:
+        matches = [(lo, hi) for lo, hi in ranges if lo == entry]
+        require(len(matches) == 1, "Requested entry is not a distinct updated function range")
+        extra.extend(subtract(matches, extra))
+        extra.sort()
+    return extra
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", required=True, type=Path)
     parser.add_argument("--analysis-dir", required=True, type=Path)
+    parser.add_argument("--entry", action="append", type=lambda value: int(value, 0), default=[],
+                        help="Newly identified function start already present as decoded bytes")
     args = parser.parse_args()
     root = args.analysis_dir.resolve()
     require(not root.is_relative_to(Path(__file__).resolve().parents[1]), "Keep generated code outside the checkout")
@@ -72,7 +84,7 @@ def main():
     require(coverage["range_count"] == len(new) and coverage["instruction_count"] == instructions and
             coverage["covered_bytes"] == instructions * 4 and
             coverage["address_and_instruction_sha256"] == digest.hexdigest(), "Decoded instruction digest mismatch")
-    extra = subtract(new, old)
+    extra = supplement_ranges(new, old, args.entry)
     require(bool(extra), "No new instructions to compile")
     output = io.StringIO()
     writer = csv.writer(output, lineterminator="\n")
@@ -91,7 +103,7 @@ def main():
     text = "[general]\n" + "\n".join(f"{k} = {json.dumps(v)}" for k, v in config.items())
     write_new(root / "additional.toml", (text + "\n[patches]\ninstructions = []\n").encode())
     report = {"new_ranges": len(extra), "new_instructions": sum((hi - lo) // 4 for lo, hi in extra),
-              "verified_full_map_instructions": instructions}
+              "verified_full_map_instructions": instructions, "identified_entries": args.entry}
     write_new(root / "supplement-verification.json", (json.dumps(report, indent=2) + "\n").encode())
     print(json.dumps(report))
 
