@@ -14,6 +14,7 @@ MAIN.BIN
 *.BIN
 *.bin
 SYSTEM.CNF
+/.yakuza-boot-state/
 IRX.DAT
 IOPRP*.IMG
 OGREDIR*.BIN

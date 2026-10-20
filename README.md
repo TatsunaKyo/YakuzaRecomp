@@ -4,7 +4,7 @@ An experimental native PC recompilation project for the original **Yakuza on Pla
 
 The goal is to bring the original PS2 game to **Windows 10/11 x64** through static recompilation. The supported research build is the **European/PAL release, SLES-54171**. Linux is used internally for development; the eventual Windows port should not require Linux or WSL.
 
-**Status: early development. There is no playable game build yet.** The current tools prepare original disc files, analyze game code and test parts of the runtime. Diagnostic executables are development tools, not the game.
+**Status: early development. There is no playable game build yet.** The current tools prepare original disc files, analyze game code, test runtime components and build an opt-in full-runtime boot probe. Diagnostic executables are development tools, not the game.
 
 This is an unofficial fan project, unaffiliated with SEGA. Original game files are not distributed with this repository.
 
@@ -41,8 +41,10 @@ There is no release date yet. Completing translation is one part of the work; ru
 - All 11 overlays analyzed separately: 10,348 decoded code ranges, 865,866 instructions, zero translation errors and 7,460 unresolved control-flow warnings. This does not establish complete code coverage.
 - A native overlay loader copies original payloads, clears BSS and replaces the prior overlay's dispatch table. Its connection to the full game runtime remains to be implemented.
 - A Linux RAM-only probe loaded all 11 overlays and passed 768 cases across three small translated GAME/HEALTH/UFO routines. Constructors, hardware and full gameplay were not executed by that probe.
-- Linux checks pass: 23 preparation-format tests, overlay swapping/bounds checks and four upstream IOP test programs. Windows CI is configured; its results must be checked after the workflow runs.
+- Linux checks pass: 25 preparation-format tests, overlay swapping/bounds checks and four upstream IOP test programs. The published default tools also passed the Windows/MSVC and Linux GitHub Actions jobs ([initial run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39410019090)). These jobs do not run the original game.
 - A Windows x64 diagnostic executable cross-builds successfully with LLVM-MinGW. Actual Windows execution remains pending; see [Windows validation](docs/windows-testing.md).
+
+The full-runtime resident/MAIN boot probe now links for Linux and Windows x64. The first Linux boot trace stalled in SDK firmware patch discovery before MAIN; compatibility work is underway. See [boot development](docs/boot-probe.md).
 
 The overlay loader and translated routine probe also cross-build for Windows x64. See [overlay research](docs/overlays.md) for the private analysis workflow and its limits.
 

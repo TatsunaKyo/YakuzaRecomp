@@ -6,7 +6,7 @@ Current evidence:
 
 | Check | Result |
 | --- | --- |
-| Native Linux build and 23 Python format tests | Passed |
+| Native Linux build and 25 Python format tests | Passed |
 | Overlay loader swapping, bounds and BSS tests on Linux | Passed |
 | Original 11 overlays loaded into RAM; three translated routines on Linux | 768 cases passed; hardware/constructors/gameplay untested |
 | Four upstream IOP test programs on Linux | Passed |
@@ -15,7 +15,8 @@ Current evidence:
 | LLVM-MinGW cross-build of overlay tests and translated routine probe | Passed; execution pending |
 | Windows PE inspection | x86-64 console executable; only Windows system/UCRT DLL imports |
 | Execution on actual Windows | Pending |
-| GitHub Actions Windows/MSVC build and tests | Configured, not yet run |
+| GitHub Actions Windows/MSVC default build and tests | Passed for c663375; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39410019090) |
+| Full-runtime resident/MAIN boot-probe cross-link | Passed; first Linux boot stalled in SDK kernel initialization |
 | Game boot, rendering, sound, input and gameplay | Pending |
 
 ## Running the Windows diagnostic

@@ -22,3 +22,12 @@ jobs:
         run: cmake --build out/checks --config Debug --parallel 2
       - name: Test
         run: ctest --test-dir out/checks -C Debug --output-on-failure
+      - name: Configure Windows runtime host with synthetic code
+        if: runner.os == 'Windows'
+        run: cmake -S . -B "${{ runner.temp }}/yakuza-boot-host" -A x64 -DYAKUZA_BUILD_BOOT_PROBE=ON -DYAKUZA_MAIN_GENERATED_DIR=${{ github.workspace }}/tests/fixtures/boot-host -DPS2X_ENABLE_FFMPEG=OFF
+      - name: Build Windows runtime host
+        if: runner.os == 'Windows'
+        run: cmake --build "${{ runner.temp }}/yakuza-boot-host" --config Debug --parallel 2 --target yakuza_boot_probe
+      - name: Validate Windows runtime host input handling
+        if: runner.os == 'Windows'
+        run: ctest --test-dir "${{ runner.temp }}/yakuza-boot-host" -C Debug --output-on-failure -R boot_host_input_validation
