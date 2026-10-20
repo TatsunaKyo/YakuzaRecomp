@@ -13,6 +13,9 @@ ARCHIVES = ("OGRE.CVM", "OGRE2.CVM", "OGRE3.CVM", "OGRE4.CVM")
 MAX_RANGE = 24 * 1024 * 1024
 MAX_BUNDLE = 28 * 1024 * 1024
 NAME = re.compile(r"(OGRE(?:[234])?\.CVM)\.([0-9a-f]{16})\.ykr\Z")
+# Verified PAL index: /MEDIA/SE/00000_CMN.DAT, first observed missing asset.
+PAL_INDEX_SHA256 = "71f0ae7b805d34262f6218178806284e92a5cf393bdf083e8e19d135d9940e99"
+BOOT_RANGES = [(name, 0, 65536) for name in ARCHIVES[:3]] + [("OGRE.CVM", 106305536, 292864)]
 
 
 def fnv(data):
@@ -46,7 +49,11 @@ def parse_range(value):
 
 
 def collect(disc, output, ranges):
-    ranges = ranges or [(name, 0, 65536) for name in ARCHIVES[:3]]
+    if not ranges:
+        index = disc / "OGREDIR.BIN"
+        if index.stat().st_size != 201346 or hashlib.sha256(index.read_bytes()).hexdigest() != PAL_INDEX_SHA256:
+            raise ValueError("The default boot collection requires the supported PAL OGREDIR.BIN")
+        ranges = BOOT_RANGES
     if (any(a not in ARCHIVES or o < 0 or not 0 < n <= MAX_RANGE for a, o, n in ranges) or
             len(set((a, o) for a, o, _ in ranges)) != len(ranges) or sum(n + HEADER.size for _, _, n in ranges) > MAX_BUNDLE):
         raise ValueError("Duplicate excerpt or bundle exceeds 28 MiB; collect smaller separate bundles")

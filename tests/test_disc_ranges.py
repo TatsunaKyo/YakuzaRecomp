@@ -9,6 +9,14 @@ import disc_ranges as ranges
 
 
 class DiscRangesTests(unittest.TestCase):
+    def test_boot_collection_requires_the_supported_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "OGREDIR.BIN").write_bytes(b"Different edition")
+            with self.assertRaises(ValueError):
+                ranges.collect(root, root / "boot-data.zip", None)
+            self.assertFalse((root / "boot-data.zip").exists())
+
     def test_round_trip_and_no_overwrite(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

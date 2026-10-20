@@ -10,7 +10,7 @@ Use Python 3.10 or newer. Download [disc_ranges.py](https://raw.githubuserconten
 py -3 .\disc_ranges.py collect --disc-dir "D:\Yakuza PAL" --output "$env:USERPROFILE\Desktop\yakuza-boot-data.zip"
 ```
 
-The folder must contain the original PAL OGRE.CVM, OGRE2.CVM and OGRE3.CVM. The command reads their sizes and copies the first 64 KiB of each into one ZIP, at most about 200 KiB. It does not modify the archives or overwrite an existing ZIP. Upload that ZIP privately to the development session. Do not commit it or its contents to GitHub.
+The folder must contain the original PAL OGRE.CVM, OGRE2.CVM, OGRE3.CVM and OGREDIR.BIN. The command verifies the supported index, reads the archive sizes and copies the first 64 KiB of each, plus the first requested asset, `/MEDIA/SE/00000_CMN.DAT`. The index places that 292864-byte asset at byte offset 106305536 in OGRE.CVM. All four excerpts total less than 500 KiB before compression. The command does not modify the archives or overwrite an existing ZIP. Upload that ZIP privately to the development session. Do not commit it or its contents to GitHub.
 
 The initial excerpts let the native reader mount the original logical archive sizes and attempt real reads. They may not include the first asset the game requests. If another read needs missing bytes, the trace stops with `yakuza-disc:missing-range`, recording archive, byte offset and length. Collect the exact logged range with `--range ARCHIVE:OFFSET:LENGTH`, accepting decimal or `0x` values. Requests larger than 24 MiB must be divided into smaller adjacent ranges; each ZIP is limited to 28 MiB. Keep every original archive unchanged between collections.
 
