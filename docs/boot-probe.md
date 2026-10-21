@@ -52,7 +52,7 @@ Choose a fresh output directory for each run. The runner preserves the executabl
 
 Add `--continue-main` to the Python command to continue into MAIN. This mode also records register values, display/DMA activity and IOP diagnostics at shutdown. PAL_NTSC.DAT is now supplied and its original two-part sector read completes. A host Cross press leaves the selection loop and reaches filesystem initialization, which searches for the absent OGRE.CVM, OGRE2.CVM and OGRE3.CVM. Missing second-layer probes return the normal SDK search-failure result.
 
-The optional [private archive-range reader](disc-ranges.md) mounts original logical file sizes from supplied excerpt records, using separate virtual sector addresses. Complete original files take priority. The host checks complete byte coverage before writing guest RAM and stops on a missing range. This permits small Windows uploads while tracing initial asset needs; it does not supply the missing archives or establish a playable boot.
+The optional [private archive-range reader](disc-ranges.md) mounts original logical file sizes from supplied excerpt records, using separate virtual sector addresses. Complete original files take priority. The host checks complete byte coverage before writing guest RAM and stops on a missing range. The supplied excerpts now complete the 292864-byte `00000_CMN.DAT` read at OGRE.CVM offset `0x6561800`. The next original request stops at offset `0x2063e800`, length `0x10000`, covering `SCENARIOSTATEDATA.BIN` and sector padding. This permits small Windows uploads while tracing initial asset needs; it does not supply the missing archives or establish a playable boot.
 
 ## Native kernel compatibility
 
