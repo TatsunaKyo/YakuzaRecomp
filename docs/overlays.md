@@ -30,7 +30,9 @@ The Python verifier hashes every exported instruction together with its PS2 addr
 
 `OverlaySlot` validates MWo3 extents and constructor pointers before modifying RAM. Activation copies the whole original file, clears that module's BSS and replaces the entire native entry table. A shorter replacement cannot retain callable entries from its predecessor. Invalid input leaves both RAM and active dispatch unchanged. Activation must occur while the EE thread is stopped, outside translated code.
 
-The loader is a standalone integration component. The full PS2Runtime's dense function table, disc-read path, constructor calls and EE scheduler still need to be connected to it. Compiling all overlays into one permanent address table would dispatch the wrong module.
+The full boot host uses a separate `BootOverlayDispatch` adapter at the original resident initializer, `0x00100350`. It verifies the complete already loaded image against the compiled module's identity, length and fingerprint before replacing entries in PS2Runtime's shared address slot. The original resident code retains payload loading, BSS clearing and constructor execution. The adapter changes no guest RAM. A shorter module clears stale callable addresses from its predecessor; invalid images or missing constructor mappings fail before the dispatch table changes.
+
+Set `YAKUZA_BOOT_OVERLAY_DIRS` to verified private analysis directories (separated by semicolons) when configuring the [full boot host](boot-probe.md). Each module is compiled separately, and only the matching active module's entries are registered. The current host includes GAME; the other ten modules have separate research translations but are not yet compiled into that host. The preparer rechecks original instruction bytes and saved verification metadata, validates every registration address and requires an exact entry for each constructor. Its generated bindings stay outside Git.
 
 ```sh
 source /workspace/.cache/yakuza-onboarding/activate.sh
@@ -51,4 +53,6 @@ The same target cross-builds with the Windows toolchain, including Unicode comma
 .\yakuza_overlay_native_probe.exe "D:\Yakuza Research\overlays\MEDIA4\MODULE"
 ```
 
-Further work needs full-runtime integration, missing indirect targets and original archive assets. Rendering, sound, controls, saves and gameplay remain unverified. OGRE.CVM, OGRE2.CVM and OGRE3.CVM are not present in this environment; no additional upload is needed to reproduce the checks above.
+Missing indirect targets encountered in a verified active overlay can be identified with `SeedOverlayIndirect.java`. It checks the observed target's bounds and original first instruction before changing analysis metadata, rejecting conflicts with classified functions. Re-export into a fresh directory, verify the instruction digest and regenerate the translation; do not skip missing calls. This does not establish complete execution coverage.
+
+Further work needs missing indirect targets, runtime compatibility and original archive assets. Rendering, sound, controls, saves and gameplay remain unverified. The three complete OGRE.CVM, OGRE2.CVM and OGRE3.CVM archives are absent; supplied partial excerpts support the currently observed reads.

@@ -12,17 +12,24 @@ import java.util.LinkedHashSet;
 
 public class SeedBootUpdateCallbacks extends GhidraScript {
     private void collectCatalog(int wordCount, long finalMethod, int expectedTables,
-            int expectedMethods, String expectedDigest, LinkedHashSet<Long> allEntries) throws Exception {
+            int expectedMethods, String expectedDigest, LinkedHashSet<Long> allEntries,
+            long... explicitTables) throws Exception {
         // Scan only PAL resident bytes; accept methods in MAIN's primary text.
         // The digest covers each table address followed by all table words,
         // in ascending address order, encoded as little-endian uint32s.
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         LinkedHashSet<Long> entries = new LinkedHashSet<>();
         int tableCount = 0;
-        for (long table = 0x100000L; table + wordCount * 4L <= 0x156280L; table += 4) {
+        boolean explicit = explicitTables.length != 0;
+        long candidates = explicit ? explicitTables.length : (0x56280L - wordCount * 4L) / 4 + 1;
+        for (long index = 0; index < candidates; ++index) {
             monitor.checkCancelled();
+            long table = explicit ? explicitTables[(int)index] : 0x100000L + index * 4;
+            if ((table & 3) != 0 || table < 0x100000L || table + wordCount * 4L > 0x156280L ||
+                    (explicit && index > 0 && table <= explicitTables[(int)index - 1]))
+                throw new IllegalStateException("Invalid PAL method table location");
             if (getInt(toAddr(table)) != 0 || getInt(toAddr(table + 4)) != 0 ||
-                    Integer.toUnsignedLong(getInt(toAddr(table + (wordCount - 1) * 4L))) != finalMethod) continue;
+                    (!explicit && Integer.toUnsignedLong(getInt(toAddr(table + (wordCount - 1) * 4L))) != finalMethod)) continue;
             long[] words = new long[wordCount];
             boolean valid = true;
             for (int i = 2; i < wordCount; ++i) {
@@ -55,6 +62,11 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
         // The interface reached after CSE_STAY.DAT uses final method 0x243080.
         collectCatalog(7, 0x243080L, 2, 9,
             "a6f5c9a2908961c29af48b1aa1edbe9095458d5b62ed8e952cae0e32afffa945", entries);
+        // The object at 0x157458 exposes the first two of these adjacent
+        // small interfaces in the observed boot trace. Verify all three.
+        collectCatalog(5, 0, 3, 9,
+            "1744351a7c07ad76175f068618a41c1177c9b0da92433357b50cb5cd4a478ae7", entries,
+            0x1427e0L, 0x142800L, 0x142820L);
         // Validate the entire catalog before changing any analysis metadata.
         for (long target : entries) {
             Address entry = toAddr(target);
@@ -82,6 +94,6 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             }
         }
         analyzeChanges(currentProgram);
-        println("Verified 253 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
+        println("Verified 256 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
     }
 }

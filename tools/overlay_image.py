@@ -144,11 +144,12 @@ def prepare(disc: Path, extracted: Path, output: Path) -> list[dict]:
     return report
 
 
-def verify(folder: Path) -> dict:
+def verify(folder: Path, *, write_outputs: bool = True) -> dict:
     elf = read_small(folder / "analysis.elf")
     layout = json.loads((folder / "layout.json").read_text())
     require(sha256(elf) == layout["analysis_sha256"], "Analysis ELF changed")
-    rows = list(csv.DictReader((folder / "decoded.csv").open()))
+    with (folder / "decoded.csv").open() as source:
+        rows = list(csv.DictReader(source))
     coverage = json.loads((folder / "coverage.json").read_text())
     require(bool(rows), "Empty decoded map")
     previous, count, digest = 0, 0, hashlib.sha256()
@@ -174,10 +175,15 @@ def verify(folder: Path) -> dict:
     text = "# Decoded overlay research probe, not a verified runnable game.\n[general]\n"
     text += "\n".join(f"{key} = {json.dumps(value)}" for key, value in config.items())
     text += "\n[patches]\ninstructions = []\n"
-    write_new(folder / "recompile.toml", text.encode())
+    if write_outputs:
+        write_new(folder / "recompile.toml", text.encode())
     result = {"module": layout["name"], "ranges": len(rows), "instructions": count,
               "seed_count": len(seeds), "decoded_csv_sha256": sha256((folder / "decoded.csv").read_bytes())}
-    write_new(folder / "verification.json", (json.dumps(result, indent=2) + "\n").encode())
+    if write_outputs:
+        write_new(folder / "verification.json", (json.dumps(result, indent=2) + "\n").encode())
+    else:
+        require(json.loads((folder / "verification.json").read_text()) == result,
+                "Overlay verification report differs from the current image/map")
     return result
 
 

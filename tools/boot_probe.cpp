@@ -5,6 +5,7 @@
 #include "runtime/ee_scheduler.h"
 #include "ps2_recompiled_functions.h"
 #include "yakuza/pal_boot_hooks.h"
+#include "yakuza/boot_overlays.h"
 #include "pal_runtime_layout.h"
 #include <atomic>
 #include <chrono>
@@ -63,6 +64,7 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
     yakuza::install_pal_kernel_hooks(runtime);
     yakuza::install_pal_sdk_hooks(runtime);
     yakuza::install_boot_supplement(runtime);
+    yakuza::install_boot_overlay_hooks(runtime, yakuza::compiled_boot_overlays());
     original_main = runtime.lookupFunction(0x22cc40);
     if (!original_main) throw std::runtime_error("Missing original MAIN entry in the generated dispatch map");
     if (!runtime.replaceFunction(0x22cc40, main_entry)) throw std::runtime_error("MAIN entry is outside dispatch table");

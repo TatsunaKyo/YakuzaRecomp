@@ -48,11 +48,29 @@ execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/too
     --generated-dir "${YAKUZA_MAIN_GENERATED_DIR}" --out-dir "${boot_private}"
     ${supplement_args}
     COMMAND_ERROR_IS_FATAL ANY)
+set(YAKUZA_BOOT_OVERLAY_DIRS "" CACHE STRING "Private verified overlay analysis directories; separate with semicolons")
+set(overlay_args)
+foreach(folder IN LISTS YAKUZA_BOOT_OVERLAY_DIRS)
+    list(APPEND overlay_args --module-dir "${folder}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${folder}/layout.json" "${folder}/verification.json" "${folder}/decoded.csv"
+        "${folder}/generated/register_functions.cpp")
+endforeach()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_overlays.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/overlay_image.py")
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_overlays.py"
+    --out-dir "${boot_private}" ${overlay_args} COMMAND_ERROR_IS_FATAL ANY)
+include("${boot_private}/boot_overlays.cmake")
+add_library(yakuza_boot_overlay_dispatch STATIC src/boot_overlays.cpp)
+target_link_libraries(yakuza_boot_overlay_dispatch PUBLIC yakuza_overlay PRIVATE ps2_runtime)
 file(GLOB boot_generated CONFIGURE_DEPENDS "${YAKUZA_MAIN_GENERATED_DIR}/*.cpp")
 list(REMOVE_ITEM boot_generated "${YAKUZA_MAIN_GENERATED_DIR}/register_functions.cpp")
 add_executable(yakuza_boot_probe tools/boot_probe.cpp src/pal_boot_hooks.cpp
-    "${boot_private}/register_boot.cpp" "${boot_private}/boot_supplement.cpp" ${boot_generated})
+    "${boot_private}/register_boot.cpp" "${boot_private}/boot_supplement.cpp"
+    "${boot_private}/register_boot_overlays.cpp" ${boot_generated})
 target_link_libraries(yakuza_boot_probe PRIVATE ps2_runtime yakuza_overlay yakuza_input yakuza_disc_ranges)
+target_link_libraries(yakuza_boot_probe PRIVATE yakuza_boot_overlay_dispatch ${YAKUZA_BOOT_OVERLAY_TARGETS})
 target_include_directories(yakuza_boot_probe PRIVATE "${YAKUZA_MAIN_GENERATED_DIR}")
 # Per-source include keeps the translated-code PCH independent of native layout.
 set_source_files_properties(tools/boot_probe.cpp src/pal_boot_hooks.cpp PROPERTIES
@@ -65,9 +83,11 @@ set_target_properties(yakuza_boot_probe PROPERTIES UNITY_BUILD ON UNITY_BUILD_BA
 # Large generated registration functions and very large guest functions compile
 # separately to keep compiler memory bounded.
 set_source_files_properties("${boot_private}/register_boot.cpp" "${boot_private}/boot_supplement.cpp"
+    "${boot_private}/register_boot_overlays.cpp"
     tools/boot_probe.cpp src/pal_boot_hooks.cpp
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 set_source_files_properties("${boot_private}/boot_supplement.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+set_source_files_properties("${boot_private}/register_boot_overlays.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 if(YAKUZA_BOOT_SUPPLEMENT_DIR)
     file(GLOB supplement_sources CONFIGURE_DEPENDS "${YAKUZA_BOOT_SUPPLEMENT_DIR}/*.cpp")
     list(REMOVE_ITEM supplement_sources "${YAKUZA_BOOT_SUPPLEMENT_DIR}/register_functions.cpp")
@@ -99,6 +119,11 @@ if(BUILD_TESTING)
     target_link_libraries(boot_priority_tests PRIVATE ps2_runtime)
     target_include_directories(boot_priority_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
     add_test(NAME boot_priority COMMAND boot_priority_tests)
+    add_executable(boot_overlay_tests tests/test_boot_overlays.cpp
+        tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
+    target_link_libraries(boot_overlay_tests PRIVATE yakuza_boot_overlay_dispatch ps2_runtime)
+    target_include_directories(boot_overlay_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
+    add_test(NAME boot_overlay COMMAND boot_overlay_tests)
     add_test(NAME boot_host_input_validation
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_boot_cli.py"
                 "$<TARGET_FILE:yakuza_boot_probe>")
