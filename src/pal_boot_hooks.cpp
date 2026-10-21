@@ -77,6 +77,10 @@ void read_disc(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
         }
         // Only final-sector padding beyond the real file size is zero-filled.
         std::fill(memory + output + actual, memory + output + count, uint8_t{0});
+        static unsigned logged = 0;
+        if (logged++ < 32)
+            std::cout << "[yakuza-disc] read " << name << " offset=0x" << std::hex << offset
+                      << " length=0x" << actual << std::dec << '\n';
         excerpt_cd_error = 0;
         SET_GPR_S32(context, 2, 1);
         return;

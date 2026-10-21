@@ -49,12 +49,26 @@ def supplement_ranges(ranges, covered, entries):
     return extra
 
 
+def previous_entries(directory, current_ranges):
+    report = json.loads(read_small(directory / "supplement-verification.json").decode())
+    require(isinstance(report, dict), "Invalid previous supplemental verification report")
+    entries = report.get("identified_entries", [])
+    require(isinstance(entries, list) and len(entries) <= 250000 and
+            all(type(entry) is int and 0x100008 <= entry < 0x592080 and entry % 4 == 0 for entry in entries),
+            "Invalid previous supplemental entry list")
+    require(not subtract(read_ranges(directory / "additional.csv"), current_ranges),
+            "Updated analysis removed previously supplemental code; reassess first")
+    return entries
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", required=True, type=Path)
     parser.add_argument("--analysis-dir", required=True, type=Path)
     parser.add_argument("--entry", action="append", type=lambda value: int(value, 0), default=[],
                         help="Newly identified function start already present as decoded bytes")
+    parser.add_argument("--previous-supplement", action="append", type=Path, default=[],
+                        help="Retain identified entries and verify code coverage from an earlier supplement")
     args = parser.parse_args()
     root = args.analysis_dir.resolve()
     require(not root.is_relative_to(Path(__file__).resolve().parents[1]), "Keep generated code outside the checkout")
@@ -84,7 +98,11 @@ def main():
     require(coverage["range_count"] == len(new) and coverage["instruction_count"] == instructions and
             coverage["covered_bytes"] == instructions * 4 and
             coverage["address_and_instruction_sha256"] == digest.hexdigest(), "Decoded instruction digest mismatch")
-    extra = supplement_ranges(new, old, args.entry)
+    entries = list(args.entry)
+    for previous in args.previous_supplement:
+        entries.extend(previous_entries(previous, new))
+    entries = list(dict.fromkeys(entries))
+    extra = supplement_ranges(new, old, entries)
     require(bool(extra), "No new instructions to compile")
     output = io.StringIO()
     writer = csv.writer(output, lineterminator="\n")
@@ -103,7 +121,8 @@ def main():
     text = "[general]\n" + "\n".join(f"{k} = {json.dumps(v)}" for k, v in config.items())
     write_new(root / "additional.toml", (text + "\n[patches]\ninstructions = []\n").encode())
     report = {"new_ranges": len(extra), "new_instructions": sum((hi - lo) // 4 for lo, hi in extra),
-              "verified_full_map_instructions": instructions, "identified_entries": args.entry}
+              "verified_full_map_instructions": instructions, "identified_entries": entries,
+              "previous_supplements": [str(path.resolve()) for path in args.previous_supplement]}
     write_new(root / "supplement-verification.json", (json.dumps(report, indent=2) + "\n").encode())
     print(json.dumps(report))
 

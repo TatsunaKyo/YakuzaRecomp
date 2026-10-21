@@ -1,12 +1,14 @@
 from pathlib import Path
+import json
 import re
 import sys
 import unittest
+import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from prepare_boot import dispatch_addresses, extend_table
 from prepare_game import FormatError
-from prepare_boot_supplement import subtract, supplement_ranges
+from prepare_boot_supplement import previous_entries, subtract, supplement_ranges
 
 FIXTURE = """extern const uint32_t g_ps2RecompiledFunctionTableBase = 0x100008u;
 extern const uint32_t g_ps2RecompiledFunctionTableEnd = 0x5918a4u;
@@ -57,6 +59,26 @@ class BootTableTests(unittest.TestCase):
         updated, baseline = [(4, 16), (16, 28), (32, 40)], [(4, 28)]
         self.assertEqual(supplement_ranges(updated, baseline, [16, 16]), [(16, 28), (32, 40)])
         with self.assertRaises(FormatError): supplement_ranges(updated, baseline, [20])
+
+    def test_later_supplement_retains_an_earlier_entry_without_new_bytes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "supplement-verification.json").write_text(json.dumps({"identified_entries": [0x100010]}))
+            (root / "additional.csv").write_text("Name,Start,End,Size\nprevious,0x100010,0x100018,8\n")
+            current = [(0x100008, 0x100010), (0x100010, 0x100018), (0x100018, 0x100020), (0x100030, 0x100038)]
+            baseline = [(0x100008, 0x100020)]
+            self.assertEqual(supplement_ranges(current, baseline, []), [(0x100030, 0x100038)])
+            self.assertEqual(supplement_ranges(current, baseline, previous_entries(root, current)),
+                             [(0x100010, 0x100018), (0x100030, 0x100038)])
+            with self.assertRaises(FormatError): previous_entries(root, [(0x100030, 0x100038)])
+
+    def test_previous_supplement_rejects_invalid_entry_metadata(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "additional.csv").write_text("Name,Start,End,Size\nprevious,0x100010,0x100018,8\n")
+            for entries in (None, [True], [0x100011], [0x592080], ["0x100010"]):
+                (root / "supplement-verification.json").write_text(json.dumps({"identified_entries": entries}))
+                with self.assertRaises(FormatError): previous_entries(root, [(0x100010, 0x100018)])
 
 
 if __name__ == "__main__": unittest.main()

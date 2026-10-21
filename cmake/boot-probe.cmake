@@ -94,6 +94,11 @@ if(BUILD_TESTING)
     target_link_libraries(boot_dispatch_tests PRIVATE ps2_runtime)
     target_include_directories(boot_dispatch_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
     add_test(NAME boot_dispatch COMMAND boot_dispatch_tests)
+    add_executable(boot_priority_tests tests/test_boot_priority.cpp
+        tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
+    target_link_libraries(boot_priority_tests PRIVATE ps2_runtime)
+    target_include_directories(boot_priority_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
+    add_test(NAME boot_priority COMMAND boot_priority_tests)
     add_test(NAME boot_host_input_validation
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_boot_cli.py"
                 "$<TARGET_FILE:yakuza_boot_probe>")

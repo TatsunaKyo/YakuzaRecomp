@@ -93,6 +93,19 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
                   << " iop_instructions=" << iop.emulatorInstructions << '\n';
         for (const auto& diagnostic : iop.diagnostics)
             std::cout << "[yakuza-iop-diagnostic] " << diagnostic << '\n';
+        runtime.eeScheduler().publishSnapshot();
+        const auto ee = runtime.eeScheduler().snapshot();
+        std::cout << "[yakuza-ee] running=" << ee.runningThreadId << " cycles=" << ee.eeCycle << '\n';
+        for (const auto& thread : ee.threads)
+            std::cout << "[yakuza-ee-thread] id=" << thread.id << " priority=" << thread.currentPriority
+                      << " status=" << static_cast<unsigned>(thread.status)
+                      << " wait=" << static_cast<unsigned>(thread.waitReason) << " wait_id=" << thread.waitId
+                      << " pc=0x" << std::hex << thread.pc << " entry=0x" << thread.entry
+                      << " ra=0x" << thread.ra << std::dec << '\n';
+        for (const auto& semaphore : ee.semaphores)
+            if (semaphore.waiters)
+                std::cout << "[yakuza-ee-semaphore] id=" << semaphore.id << " count=" << semaphore.count
+                          << " waiters=" << semaphore.waiters << '\n';
         for (unsigned reg = 1; reg < 32; ++reg)
             std::cout << "[yakuza-register] r" << reg << "=0x" << std::hex
                       << GPR_U64((&runtime.cpu()), reg) << std::dec << '\n';

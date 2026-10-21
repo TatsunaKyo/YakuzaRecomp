@@ -12,7 +12,7 @@ With Visual Studio 2022's C++ workload, Git, Python 3.10+ and CMake installed, u
 cmake -S . -B "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" -A x64 `
   -DYAKUZA_BUILD_BOOT_PROBE=ON `
   -DYAKUZA_MAIN_GENERATED_DIR="D:\Yakuza Research\generated-pal-probe" `
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v17\generated" `
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v21\generated" `
   -DPS2X_ENABLE_FFMPEG=OFF
 cmake --build "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" --config Debug --parallel 2 --target yakuza_boot_probe
 & "$env:LOCALAPPDATA\YakuzaRecomp\boot-build\Debug\yakuza_boot_probe.exe" "D:\Yakuza PAL" 15 "$env:LOCALAPPDATA\YakuzaRecomp\boot-state"
@@ -38,7 +38,7 @@ cmake -S . -B /workspace/scratch/yakuza-pal/boot-build -G Ninja \
   -DCMAKE_PREFIX_PATH=/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr \
   -DYAKUZA_BUILD_BOOT_PROBE=ON \
   -DYAKUZA_MAIN_GENERATED_DIR=/workspace/scratch/yakuza-pal/generated-pal-probe \
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v17/generated
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v21/generated
 cmake --build /workspace/scratch/yakuza-pal/boot-build --target yakuza_boot_probe --parallel 2
 python tools/run_boot_probe.py \
   --exe /workspace/scratch/yakuza-pal/boot-build/yakuza_boot_probe \
@@ -76,6 +76,8 @@ The PAL vertical-blank helper at `0x001056c0` registers two stack-local pointers
 
 The runtime's call dispatcher also treated an unchanged entry PC as an implicit function return. During recursive guest calls, a scheduler safe point can leave PC at that same address while an outer guest stack frame remains active. Returning to the caller at that point corrupts subsequent stack restoration. The PAL runtime adaptation requires an explicit return to the caller PC instead. A synthetic regression forces this recursive yield: it fails with the pinned dispatch behavior and passes with the adaptation. Native SDK wrappers already set their return PC explicitly.
 
+The original CRI critical section saves the return value of `ChangeThreadPriority`, temporarily raises the calling thread to priority 1, then restores the saved priority. The pinned syscall wrapper returned zero on success, so restoration requested invalid priority zero and left the main thread ahead of the ready I/O workers. The private runtime adaptation returns the previous priority on success from both ordinary and interrupt-safe variants, preserving actual negative errors. A display-free regression checks boost/restore and invalid-priority/thread cases; it fails against the pinned behavior. Continued-run diagnostics now include EE thread priorities, states and waiting semaphores to distinguish a scheduler stall from a missing asset.
+
 ## Host controller adapter
 
 The original PAL device bus uses DBC_Manager and ds2u_d, rather than the standard libpad calls. The adapter observes successful original controller-open RPC replies and retains their actual port/handle mapping. It leaves original IOP module loading and open operations intact. Three identified SDK calls use the host backend for the first logical port: readiness at `0x001263a0`, capabilities at `0x001262d0` and input data at `0x001261f8`. The original SDK active-handle flag must still be set.
@@ -88,7 +90,11 @@ In an internal Linux test, a real X11 X key press changed the sample from `ffff`
 
 The first constructor pass revealed a missing entry at `0x0013a2a0`. Its address comes from the original resident constructor table at `0x0013a304`. [SeedResidentCtor.java](../tools/ghidra/SeedResidentCtor.java) checks that pointer before changing Ghidra analysis metadata. It preserves all original bytes.
 
-[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The v17 supplement translates 474 instructions in 25 ranges, including the resident constructor and observed graphics, input and filesystem methods. Generation reports zero errors and two unresolved indirect-control-flow warnings. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings. When a newly identified method shares decoded bytes with an old chunk, registration checks the original address/slot pairs and preserves those existing mappings.
+[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The v21 supplement translates 617 instructions in 43 ranges, including the resident constructor and observed graphics, input and filesystem methods. Generation reports zero errors and two unresolved indirect-control-flow warnings. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings. When a newly identified method shares decoded bytes with an old chunk, registration checks the original address/slot pairs and preserves those existing mappings.
+
+Pass `--previous-supplement /path/to/earlier-pass` when preparing a later supplement. This option carries forward identified entries and checks that their earlier code remains covered. It can be repeated to combine older passes. Preserving decoded bytes alone is insufficient: a newly callable entry inside those bytes can otherwise disappear from the next dispatch map. A regression reproduces that omission and verifies entry retention.
+
+[SeedCvmCallbacks.java](../tools/ghidra/SeedCvmCallbacks.java) verifies all 25 words of the original CVM interface table at `0x0044e680` before classifying its 17 nonzero callbacks. The original archive-open and seek calls reached this table after the private boot-data ZIP was supplied. The script checks executable targets and rejects conflicting function boundaries; it changes analysis metadata only. Include its identified starts with `--entry` when preparing their first supplement, then retain them with `--previous-supplement` on subsequent passes.
 
 The graphics method at `0x0018fda0` is referenced by the original vtable word at `0x0013a914`. Its bytes were already decoded at the end of another chunk, but had no callable registration. [SeedGraphicsEntry.java](../tools/ghidra/SeedGraphicsEntry.java) checks the vtable pointer before classifying the function. The supplemental generator's `--entry 0x18fda0` preserves that newly identified entry even though no new instruction bytes were discovered. It does not replace the original method's return value with an invented result.
 
@@ -98,7 +104,7 @@ The graphics method at `0x0018fda0` is referenced by the original vtable word at
 
 The default runtime reserves the top 1 MiB of EE RAM for helpers. MAIN's original allocator then fails a 0x3c3500-byte graphics allocation. Its subsequent cleanup reads an invalid slot and loops. Returning the original PAL heap boundary, 0x1fe0000 below the 128 KiB main stack, makes that allocation succeed and reaches the original PAL display-mode setup call.
 
-[prepare_runtime.py](../tools/prepare_runtime.py) verifies the exact source digests of the two adapted upstream files and creates private build copies. The source checkout stays intact. [pal-runtime-layout.json](../config/pal-runtime-layout.json) defines disjoint low-memory regions above the native kernel mirrors and below the resident executable at 0x100000:
+[prepare_runtime.py](../tools/prepare_runtime.py) verifies the exact source digests of the three adapted upstream files and creates private build copies. The source checkout stays intact. [pal-runtime-layout.json](../config/pal-runtime-layout.json) defines disjoint low-memory regions above the native kernel mirrors and below the resident executable at 0x100000:
 
 | Native region | Start | End (exclusive) |
 | --- | --- | --- |
@@ -113,4 +119,4 @@ The generator rejects overlapping regions. MAIN entry configures the separate he
 
 ## Public CI
 
-GitHub Actions builds the default tools on Windows/MSVC and Linux. A separate Windows host check compiles the full desktop runtime with clearly labeled synthetic code, exercises invalid-input rejection before window creation and checks recursive dispatch yields without a display. This checks the host build without distributing original game files. It does not boot or validate the game.
+GitHub Actions builds the default tools on Windows/MSVC and Linux. A separate Windows host check compiles the full desktop runtime with clearly labeled synthetic code, exercises invalid-input rejection before window creation and checks recursive dispatch yields and priority syscall return values without a display. This checks the host build without distributing original game files. It does not boot or validate the game.

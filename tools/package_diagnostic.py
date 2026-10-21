@@ -18,6 +18,7 @@ SOURCE_FILES = [
     "tools/ghidra/SeedOverlay.java", "tools/ghidra/ExportOverlay.java", "tools/ghidra/SeedResidentCtor.java",
     "tools/ghidra/SeedGraphicsEntry.java", "tools/prepare_runtime.py", "config/pal-runtime-layout.json",
     "tools/ghidra/SeedObservedEntry.java",
+    "tools/ghidra/SeedCvmCallbacks.java",
     "include/yakuza/overlay_slot.h", "src/overlay_slot.cpp",
     "include/yakuza/native_pad.h", "src/native_pad.cpp", "tests/test_native_pad.cpp",
     "include/yakuza/disc_ranges.h", "src/disc_ranges.cpp", "tools/disc_ranges.py",
@@ -25,7 +26,7 @@ SOURCE_FILES = [
     "tests/test_overlay_image.py", "tests/test_overlay_slot.cpp",
     "cmake/boot-probe.cmake", "docs/boot-probe.md", "include/yakuza/pal_boot_hooks.h",
     "src/pal_boot_hooks.cpp", "tools/boot_probe.cpp", "tools/prepare_boot.py", "tools/run_boot_probe.py", "tools/prepare_boot_supplement.py",
-    "tests/test_prepare_boot.py", "tests/check_boot_cli.py", "tests/test_boot_dispatch.cpp",
+    "tests/test_prepare_boot.py", "tests/check_boot_cli.py", "tests/test_boot_dispatch.cpp", "tests/test_boot_priority.cpp",
     "tests/fixtures/boot-host/register_functions.cpp", "tests/fixtures/boot-host/synthetic_entry.cpp",
     "tests/fixtures/boot-host/ps2_recompiled_functions.h", "tests/fixtures/boot-host/ps2_recompiled_stubs.h",
 ]

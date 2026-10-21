@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build private PAL memory-layout and dispatch adaptations of the pinned runtime.
+"""Build private PAL memory-layout, dispatch and syscall adaptations.
 
 Keep the dependency checkout intact. Original game files and translated
 instructions are never patched here.
@@ -14,6 +14,7 @@ from prepare_game import require
 HASHES = {
     "Kernel/Syscalls/Helpers/State.h": "88a8a4b4991b87fe052a4d3555facbb355207dd8572eaa1ff978c1fc712bf6c4",
     "ps2_runtime.cpp": "77cd184f2e70eacfd5ea584ec95829553e3deeead0a19c04e4b0970dd7c6c9ee",
+    "Kernel/Syscalls/Thread.cpp": "e73d7f0a46d07fc0f70d5b49b6453ed64271b3ad19ffd62a6a872095491bcdf4",
 }
 
 
@@ -78,6 +79,15 @@ def main():
     // SDK wrappers set PC to the caller before invoking their service.
 """)
     texts["ps2_runtime.cpp"] = runtime
+    thread = texts["Kernel/Syscalls/Thread.cpp"]
+    thread = replace(thread, """            const int result = ee.changePriority(id, priority, interruptSafe, oldPriority);
+            setReturnS32(ctx, result);
+""", """            const int result = ee.changePriority(id, priority, interruptSafe, oldPriority);
+            // The EE syscall returns the previous priority on success. SDK
+            // critical sections save that value and restore it on exit.
+            setReturnS32(ctx, result == 0 ? oldPriority : result);
+""")
+    texts["Kernel/Syscalls/Thread.cpp"] = thread
     for path in source.rglob("*"):
         require(not path.is_symlink(), "Unexpected symlink in pinned runtime source")
         if not path.is_file(): continue
@@ -91,7 +101,7 @@ def main():
     header += f"inline constexpr unsigned game_heap_end = 0x{layout['game_heap_end']:x}u;\n}}\n"
     save(output / "pal_runtime_layout.h", header.encode())
     save(output / "adaptation.json", (json.dumps({"source_sha256": HASHES, "layout": layout}, indent=2) + "\n").encode())
-    print("Prepared private PAL runtime: separate heaps and preserve recursive dispatch yields")
+    print("Prepared private PAL runtime: separate heaps, recursive yields and priority return values")
 
 
 if __name__ == "__main__": main()
