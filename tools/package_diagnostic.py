@@ -19,6 +19,7 @@ SOURCE_FILES = [
     "tools/ghidra/SeedGraphicsEntry.java", "tools/prepare_runtime.py", "config/pal-runtime-layout.json",
     "tools/ghidra/SeedObservedEntry.java",
     "tools/ghidra/SeedCvmCallbacks.java",
+    "tools/ghidra/SeedBootUpdateCallbacks.java",
     "include/yakuza/overlay_slot.h", "src/overlay_slot.cpp",
     "include/yakuza/native_pad.h", "src/native_pad.cpp", "tests/test_native_pad.cpp",
     "include/yakuza/disc_ranges.h", "src/disc_ranges.cpp", "tools/disc_ranges.py",

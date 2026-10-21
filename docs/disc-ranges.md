@@ -28,10 +28,12 @@ The second supplied bundle covers `/MEDIA/TALK/SCENARIOSTATEDATA.BIN` at OGRE.CV
 
 The third supplied bundle covers `/MEDIA/PLAYERPOS/PLAYERPOS.BIN` at OGRE.CVM offset `0x6545000`. Its 34816-byte read, including sector padding around the 34084-byte payload, also completes.
 
-The next traced read covers `/MEDIA/TALK/NOWLOADING/TALK_NOWLOADING.BIN` in OGRE.CVM. Its payload is 2972 bytes; the original request reads 4096 bytes (4 KiB) including sector padding. Collect that exact range with:
+The fourth supplied bundle covers `/MEDIA/TALK/NOWLOADING/TALK_NOWLOADING.BIN` at OGRE.CVM offset `0x20ca0000`. Its 4096-byte read completes, including padding around the 2972-byte payload. Continued execution then revealed missing object callbacks; the supplemental translation now gets past those observed calls.
+
+The next traced read covers `/MEDIA/CSE/BRI/CSE_STAY.DAT` in OGRE.CVM. Its payload is 42864 bytes; the original request reads 43008 bytes (42 KiB) including sector padding. Collect that exact range with:
 
 ```powershell
-py -3 .\disc_ranges.py collect --iso "E:\Games\Yakuza (Europe).iso.gz" --range "OGRE.CVM:0x20ca0000:0x1000" --output ".\yakuza-boot-data-4.zip"
+py -3 .\disc_ranges.py collect --iso "E:\Games\Yakuza (Europe).iso.gz" --range "OGRE.CVM:0x10ce800:0xa800" --output ".\yakuza-boot-data-5.zip"
 ```
 
 ## Import and run internally

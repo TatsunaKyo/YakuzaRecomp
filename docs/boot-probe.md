@@ -12,7 +12,7 @@ With Visual Studio 2022's C++ workload, Git, Python 3.10+ and CMake installed, u
 cmake -S . -B "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" -A x64 `
   -DYAKUZA_BUILD_BOOT_PROBE=ON `
   -DYAKUZA_MAIN_GENERATED_DIR="D:\Yakuza Research\generated-pal-probe" `
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v23\generated" `
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v32\generated" `
   -DPS2X_ENABLE_FFMPEG=OFF
 cmake --build "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" --config Debug --parallel 2 --target yakuza_boot_probe
 & "$env:LOCALAPPDATA\YakuzaRecomp\boot-build\Debug\yakuza_boot_probe.exe" "D:\Yakuza PAL" 15 "$env:LOCALAPPDATA\YakuzaRecomp\boot-state"
@@ -38,7 +38,7 @@ cmake -S . -B /workspace/scratch/yakuza-pal/boot-build -G Ninja \
   -DCMAKE_PREFIX_PATH=/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr \
   -DYAKUZA_BUILD_BOOT_PROBE=ON \
   -DYAKUZA_MAIN_GENERATED_DIR=/workspace/scratch/yakuza-pal/generated-pal-probe \
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v23/generated
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v32/generated
 cmake --build /workspace/scratch/yakuza-pal/boot-build --target yakuza_boot_probe --parallel 2
 python tools/run_boot_probe.py \
   --exe /workspace/scratch/yakuza-pal/boot-build/yakuza_boot_probe \
@@ -52,7 +52,7 @@ Choose a fresh output directory for each run. The runner preserves the executabl
 
 Add `--continue-main` to the Python command to continue into MAIN. This mode also records register values, display/DMA activity and IOP diagnostics at shutdown. PAL_NTSC.DAT is now supplied and its original two-part sector read completes. A host Cross press leaves the selection loop and reaches filesystem initialization, which searches for the absent OGRE.CVM, OGRE2.CVM and OGRE3.CVM. Missing second-layer probes return the normal SDK search-failure result.
 
-The optional [private archive-range reader](disc-ranges.md) mounts original logical file sizes from supplied excerpt records, using separate virtual sector addresses. Complete original files take priority. The host checks complete byte coverage before writing guest RAM and stops on a missing range. The supplied excerpts now complete the 292864-byte `00000_CMN.DAT` read at OGRE.CVM offset `0x6561800`, the 65536-byte `SCENARIOSTATEDATA.BIN` read at `0x2063e800` and the 34816-byte `PLAYERPOS.BIN` read at `0x6545000`, including sector padding. The next original request stops at offset `0x20ca0000`, length `0x1000`, covering `TALK_NOWLOADING.BIN` and padding. This permits small Windows uploads while tracing initial asset needs; it does not supply the missing archives or establish a playable boot.
+The optional [private archive-range reader](disc-ranges.md) mounts original logical file sizes from supplied excerpt records, using separate virtual sector addresses. Complete original files take priority. The host checks complete byte coverage before writing guest RAM and stops on a missing range. The supplied excerpts now complete four OGRE.CVM reads: `00000_CMN.DAT` at offset `0x6561800`, length `0x47800`; `SCENARIOSTATEDATA.BIN` at `0x2063e800`, length `0x10000`; `PLAYERPOS.BIN` at `0x6545000`, length `0x8800`; and `TALK_NOWLOADING.BIN` at `0x20ca0000`, length `0x1000`. These include original sector padding. After the callback analysis below, continued execution stops at offset `0x10ce800`, length `0xa800`, covering `CSE_STAY.DAT` and padding. No missing dispatch target is reported at that stop. This permits small Windows uploads while tracing initial asset needs; it does not supply the missing archives or establish a playable boot.
 
 ## Native kernel compatibility
 
@@ -90,11 +90,13 @@ In an internal Linux test, a real X11 X key press changed the sample from `ffff`
 
 The first constructor pass revealed a missing entry at `0x0013a2a0`. Its address comes from the original resident constructor table at `0x0013a304`. [SeedResidentCtor.java](../tools/ghidra/SeedResidentCtor.java) checks that pointer before changing Ghidra analysis metadata. It preserves all original bytes.
 
-[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The v23 supplement translates 644 instructions in 46 ranges, including the resident constructor and observed graphics, input and filesystem methods. Generation reports zero errors and two unresolved indirect-control-flow warnings. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings. When a newly identified method shares decoded bytes with an old chunk, registration checks the original address/slot pairs and preserves those existing mappings.
+[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The v32 supplement translates 2335 instructions in 117 ranges, including the resident constructor and identified graphics, input, filesystem and object methods. Generation reports zero errors and nine unresolved indirect-control-flow diagnostics, each emitted twice. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings. When a newly identified method shares decoded bytes with an old chunk, registration checks the original address/slot pairs and preserves those existing mappings.
 
 Pass `--previous-supplement /path/to/earlier-pass` when preparing a later supplement. This option carries forward identified entries and checks that their earlier code remains covered. It can be repeated to combine older passes. Preserving decoded bytes alone is insufficient: a newly callable entry inside those bytes can otherwise disappear from the next dispatch map. A regression reproduces that omission and verifies entry retention.
 
 [SeedCvmCallbacks.java](../tools/ghidra/SeedCvmCallbacks.java) verifies all 25 words of the original CVM interface table at `0x0044e680` before classifying its 17 nonzero callbacks. The original archive-open and seek calls reached this table after the private boot-data ZIP was supplied. The script checks executable targets and rejects conflicting function boundaries; it changes analysis metadata only. Include its identified starts with `--entry` when preparing their first supplement, then retain them with `--previous-supplement` on subsequent passes.
+
+[SeedBootUpdateCallbacks.java](../tools/ghidra/SeedBootUpdateCallbacks.java) identifies two original object-method table families after the boot update and draw paths reached missing callbacks. It scans only the supported PAL resident bytes and accepts aligned method pointers inside MAIN's primary text. Before editing analysis metadata, it verifies complete SHA-256 catalogs: 240 seven-word tables sharing final method `0x0026ea10`, and eleven six-word tables sharing `0x0029e4b0`. These contain 686 distinct methods, many already identified by earlier analysis. The script checks executable targets and rejects conflicting function boundaries, then identifies remaining function entries. A changed-table check rejects the altered catalog; repeating the script on the supported analysis identifies zero further entries. Original empty methods retain their return instructions. Pass newly callable starts with `--entry` and retain the resulting supplement as above.
 
 The graphics method at `0x0018fda0` is referenced by the original vtable word at `0x0013a914`. Its bytes were already decoded at the end of another chunk, but had no callable registration. [SeedGraphicsEntry.java](../tools/ghidra/SeedGraphicsEntry.java) checks the vtable pointer before classifying the function. The supplemental generator's `--entry 0x18fda0` preserves that newly identified entry even though no new instruction bytes were discovered. It does not replace the original method's return value with an invented result.
 

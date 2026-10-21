@@ -27,7 +27,7 @@ The original loader now reads MAIN.BIN and reaches its entry point in the Linux 
 3. **Validate Windows execution.** Run the diagnostic and boot builds on Windows, checking crashes, dependency loading and paths. Cross-compilation alone does not complete this milestone.
 4. **Bring up the game.** Work through graphics and VU behavior, audio, controls, memory-card saves and gameplay, validating each feature with the original PAL data.
 
-The supplied private boot-data bundles provide original headers from OGRE.CVM, OGRE2.CVM and OGRE3.CVM, plus ranges covering `00000_CMN.DAT`, `SCENARIOSTATEDATA.BIN` and `PLAYERPOS.BIN`. The native host mounts those partial archives and completes all three reads. The next traced request needs a 4 KiB range covering `TALK_NOWLOADING.BIN`. A [Windows collection tool](docs/disc-ranges.md) reads an extracted disc folder, `.iso` or `.iso.gz` and copies exact original ranges into a private ZIP. Compressed images do not require a full decompressed copy. The complete three archives remain absent.
+The supplied private boot-data bundles provide original headers from OGRE.CVM, OGRE2.CVM and OGRE3.CVM, plus ranges covering `00000_CMN.DAT`, `SCENARIOSTATEDATA.BIN`, `PLAYERPOS.BIN` and `TALK_NOWLOADING.BIN`. The native host mounts those partial archives and completes all four reads. A [Windows collection tool](docs/disc-ranges.md) reads an extracted disc folder, `.iso` or `.iso.gz` and copies exact original ranges into a private ZIP. Compressed images do not require a full decompressed copy. Further data needs are traced as initialization continues; the complete three archives remain absent.
 
 The supplied `PAL_NTSC.DAT` now loads through the original disc-read path. Native vertical-blank and recursive-dispatch fixes address observed stack corruption. A first-port controller adapter passes host keyboard input into the original PAL selection code; an X key press is observed as Cross. Execution then reaches filesystem and archive initialization. A priority-syscall correction lets the original I/O workers run, and supplemental translation retains previously identified callback entries. Captured output is still blank/incorrect.
 
@@ -36,6 +36,7 @@ There is no release date yet. Completing translation is one part of the work; ru
 ## Current evidence
 
 - Resident and MAIN overlay code analyzed with the PS2 R5900 Ghidra extension.
+- Two original object-method table families verified by SHA-256: 251 tables containing 686 distinct methods. Analysis identifies previously missing callback entries while preserving original instruction bytes. This does not establish execution coverage for every method.
 - A static generation probe reports zero unhandled-instruction errors, with unresolved control-flow warnings still remaining.
 - The resident/MAIN translation compiles and links with the full desktop runtime for Linux x86-64 and Windows x64. A newly discovered resident constructor is translated separately, with the original instruction bytes verified.
 - All nine original driver modules from the supplied PAL IRX.DAT initialized in the minimal IOP probe, creating eight RPC servers. This does not verify audio, controller or memory-card behavior.
