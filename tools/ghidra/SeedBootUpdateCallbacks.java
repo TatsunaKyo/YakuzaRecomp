@@ -46,12 +46,15 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
 
     public void run() throws Exception {
         LinkedHashSet<Long> entries = new LinkedHashSet<>();
-        // Two zero header words precede the methods in both observed families.
+        // Two zero header words precede the methods in these observed families.
         // Update objects share final method 0x26ea10; draw objects use 0x29e4b0.
         collectCatalog(7, 0x26ea10L, 240, 663,
             "1f548812c68d61eacc37374e7e19346f0b1d813ab4fe064497c0a4dbc9726936", entries);
         collectCatalog(6, 0x29e4b0L, 11, 23,
             "93d54ecebb7110ac4c85b3e3711949d0b31c52b9e39cec976fd3462eaa2c0132", entries);
+        // The interface reached after CSE_STAY.DAT uses final method 0x243080.
+        collectCatalog(7, 0x243080L, 2, 9,
+            "a6f5c9a2908961c29af48b1aa1edbe9095458d5b62ed8e952cae0e32afffa945", entries);
         // Validate the entire catalog before changing any analysis metadata.
         for (long target : entries) {
             Address entry = toAddr(target);
@@ -79,6 +82,6 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             }
         }
         analyzeChanges(currentProgram);
-        println("Verified 251 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
+        println("Verified 253 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
     }
 }
