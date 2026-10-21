@@ -26,10 +26,12 @@ The initial excerpts let the native reader mount the original logical archive si
 
 The second supplied bundle covers `/MEDIA/TALK/SCENARIOSTATEDATA.BIN` at OGRE.CVM offset `0x2063e800`. Its 65536-byte read, including sector padding around the 63564-byte payload, now completes.
 
-The next traced read covers `/MEDIA/PLAYERPOS/PLAYERPOS.BIN` in OGRE.CVM. Its payload is 34084 bytes; the original request reads 34816 bytes (34 KiB) including sector padding. Collect that exact range with:
+The third supplied bundle covers `/MEDIA/PLAYERPOS/PLAYERPOS.BIN` at OGRE.CVM offset `0x6545000`. Its 34816-byte read, including sector padding around the 34084-byte payload, also completes.
+
+The next traced read covers `/MEDIA/TALK/NOWLOADING/TALK_NOWLOADING.BIN` in OGRE.CVM. Its payload is 2972 bytes; the original request reads 4096 bytes (4 KiB) including sector padding. Collect that exact range with:
 
 ```powershell
-py -3 .\disc_ranges.py collect --iso "E:\Games\Yakuza (Europe).iso.gz" --range "OGRE.CVM:0x6545000:0x8800" --output ".\yakuza-boot-data-3.zip"
+py -3 .\disc_ranges.py collect --iso "E:\Games\Yakuza (Europe).iso.gz" --range "OGRE.CVM:0x20ca0000:0x1000" --output ".\yakuza-boot-data-4.zip"
 ```
 
 ## Import and run internally
