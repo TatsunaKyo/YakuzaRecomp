@@ -24,10 +24,12 @@ The folder or ISO root must contain the original PAL OGRE.CVM, OGRE2.CVM, OGRE3.
 
 The initial excerpts let the native reader mount the original logical archive sizes and complete the observed `00000_CMN.DAT` read. If another read needs missing bytes, the trace stops with `yakuza-disc:missing-range`, recording archive, byte offset and length. Collect the exact logged range with `--range ARCHIVE:OFFSET:LENGTH`, accepting decimal or `0x` values. Requests larger than 24 MiB must be divided into smaller adjacent ranges; each ZIP is limited to 28 MiB. Keep every original archive unchanged between collections.
 
-The next traced read covers `/MEDIA/TALK/SCENARIOSTATEDATA.BIN` in OGRE.CVM. Its payload is 63564 bytes; the original request reads 65536 bytes including sector padding. After supplying the first bundle, collect the next range with:
+The second supplied bundle covers `/MEDIA/TALK/SCENARIOSTATEDATA.BIN` at OGRE.CVM offset `0x2063e800`. Its 65536-byte read, including sector padding around the 63564-byte payload, now completes.
+
+The next traced read covers `/MEDIA/PLAYERPOS/PLAYERPOS.BIN` in OGRE.CVM. Its payload is 34084 bytes; the original request reads 34816 bytes (34 KiB) including sector padding. Collect that exact range with:
 
 ```powershell
-py -3 .\disc_ranges.py collect --iso "E:\Games\Yakuza (Europe).iso.gz" --range "OGRE.CVM:0x2063e800:0x10000" --output ".\yakuza-boot-data-2.zip"
+py -3 .\disc_ranges.py collect --iso "E:\Games\Yakuza (Europe).iso.gz" --range "OGRE.CVM:0x6545000:0x8800" --output ".\yakuza-boot-data-3.zip"
 ```
 
 ## Import and run internally

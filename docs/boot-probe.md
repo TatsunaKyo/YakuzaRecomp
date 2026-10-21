@@ -12,7 +12,7 @@ With Visual Studio 2022's C++ workload, Git, Python 3.10+ and CMake installed, u
 cmake -S . -B "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" -A x64 `
   -DYAKUZA_BUILD_BOOT_PROBE=ON `
   -DYAKUZA_MAIN_GENERATED_DIR="D:\Yakuza Research\generated-pal-probe" `
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v21\generated" `
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v23\generated" `
   -DPS2X_ENABLE_FFMPEG=OFF
 cmake --build "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" --config Debug --parallel 2 --target yakuza_boot_probe
 & "$env:LOCALAPPDATA\YakuzaRecomp\boot-build\Debug\yakuza_boot_probe.exe" "D:\Yakuza PAL" 15 "$env:LOCALAPPDATA\YakuzaRecomp\boot-state"
@@ -38,7 +38,7 @@ cmake -S . -B /workspace/scratch/yakuza-pal/boot-build -G Ninja \
   -DCMAKE_PREFIX_PATH=/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr \
   -DYAKUZA_BUILD_BOOT_PROBE=ON \
   -DYAKUZA_MAIN_GENERATED_DIR=/workspace/scratch/yakuza-pal/generated-pal-probe \
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v21/generated
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v23/generated
 cmake --build /workspace/scratch/yakuza-pal/boot-build --target yakuza_boot_probe --parallel 2
 python tools/run_boot_probe.py \
   --exe /workspace/scratch/yakuza-pal/boot-build/yakuza_boot_probe \
@@ -52,7 +52,7 @@ Choose a fresh output directory for each run. The runner preserves the executabl
 
 Add `--continue-main` to the Python command to continue into MAIN. This mode also records register values, display/DMA activity and IOP diagnostics at shutdown. PAL_NTSC.DAT is now supplied and its original two-part sector read completes. A host Cross press leaves the selection loop and reaches filesystem initialization, which searches for the absent OGRE.CVM, OGRE2.CVM and OGRE3.CVM. Missing second-layer probes return the normal SDK search-failure result.
 
-The optional [private archive-range reader](disc-ranges.md) mounts original logical file sizes from supplied excerpt records, using separate virtual sector addresses. Complete original files take priority. The host checks complete byte coverage before writing guest RAM and stops on a missing range. The supplied excerpts now complete the 292864-byte `00000_CMN.DAT` read at OGRE.CVM offset `0x6561800`. The next original request stops at offset `0x2063e800`, length `0x10000`, covering `SCENARIOSTATEDATA.BIN` and sector padding. This permits small Windows uploads while tracing initial asset needs; it does not supply the missing archives or establish a playable boot.
+The optional [private archive-range reader](disc-ranges.md) mounts original logical file sizes from supplied excerpt records, using separate virtual sector addresses. Complete original files take priority. The host checks complete byte coverage before writing guest RAM and stops on a missing range. The supplied excerpts now complete the 292864-byte `00000_CMN.DAT` read at OGRE.CVM offset `0x6561800` and the 65536-byte `SCENARIOSTATEDATA.BIN` read at `0x2063e800`, including sector padding. The next original request stops at offset `0x6545000`, length `0x8800`, covering `PLAYERPOS.BIN` and padding. This permits small Windows uploads while tracing initial asset needs; it does not supply the missing archives or establish a playable boot.
 
 ## Native kernel compatibility
 
@@ -90,7 +90,7 @@ In an internal Linux test, a real X11 X key press changed the sample from `ffff`
 
 The first constructor pass revealed a missing entry at `0x0013a2a0`. Its address comes from the original resident constructor table at `0x0013a304`. [SeedResidentCtor.java](../tools/ghidra/SeedResidentCtor.java) checks that pointer before changing Ghidra analysis metadata. It preserves all original bytes.
 
-[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The v21 supplement translates 617 instructions in 43 ranges, including the resident constructor and observed graphics, input and filesystem methods. Generation reports zero errors and two unresolved indirect-control-flow warnings. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings. When a newly identified method shares decoded bytes with an old chunk, registration checks the original address/slot pairs and preserves those existing mappings.
+[prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) verifies the updated instruction digest against the byte-preserving PAL analysis image and rejects removed baseline coverage. The v23 supplement translates 644 instructions in 46 ranges, including the resident constructor and observed graphics, input and filesystem methods. Generation reports zero errors and two unresolved indirect-control-flow warnings. Its synthetic ELF header entry is adjusted for partial registration; loaded instruction bytes are unchanged. `YAKUZA_BOOT_SUPPLEMENT_DIR` adds its dispatch entries without replacing existing resident/MAIN mappings. When a newly identified method shares decoded bytes with an old chunk, registration checks the original address/slot pairs and preserves those existing mappings.
 
 Pass `--previous-supplement /path/to/earlier-pass` when preparing a later supplement. This option carries forward identified entries and checks that their earlier code remains covered. It can be repeated to combine older passes. Preserving decoded bytes alone is insufficient: a newly callable entry inside those bytes can otherwise disappear from the next dispatch map. A regression reproduces that omission and verifies entry retention.
 
