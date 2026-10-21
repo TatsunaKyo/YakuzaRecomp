@@ -48,18 +48,19 @@ def translated_fixture(folder):
 
 
 class BootOverlayPreparationTests(unittest.TestCase):
-    def test_sparse_binding_preserves_verified_inputs_and_handles_unicode_paths(self):
+    def test_sparse_binding_preserves_inputs_and_canonical_unicode_paths(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            folder = translated_fixture(root / "Game data à")
+            (root / "alias").mkdir()
+            folder = translated_fixture(root / "alias" / ".." / "Game data à")
             before = {p: p.read_bytes() for p in folder.rglob("*") if p.is_file()}
             report = prepare([folder], root / "bindings")
             self.assertEqual(report[0]["sources"], 1)
-            source = (root / "bindings/register_boot_overlays.cpp").read_text()
+            source = (root / "bindings/register_boot_overlays.cpp").read_text(encoding="utf-8")
             self.assertIn(f"{{0x{SLOT_START + 128:x}u, original}}", source)
             self.assertIn('2u, "game.bin", 224u', source)
-            cmake = (root / "bindings/boot_overlays.cmake").read_text()
-            self.assertIn("[==[" + (folder / "generated/original.cpp").as_posix() + "]==]", cmake)
+            cmake = (root / "bindings/boot_overlays.cmake").read_text(encoding="utf-8")
+            self.assertIn("[==[" + (folder.resolve() / "generated/original.cpp").as_posix() + "]==]", cmake)
             self.assertEqual(before, {p: p.read_bytes() for p in before})
 
     def test_changed_original_image_or_verification_proof_is_rejected(self):

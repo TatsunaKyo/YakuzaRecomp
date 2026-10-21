@@ -56,8 +56,8 @@ def module(folder):
 
 
 def write_changed(path, text):
-    if not path.exists() or path.read_text() != text:
-        path.write_text(text)
+    if not path.exists() or path.read_text(encoding="utf-8") != text:
+        path.write_text(text, encoding="utf-8")
 
 
 def cmake_path(path):
