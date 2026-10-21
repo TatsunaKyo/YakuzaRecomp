@@ -59,9 +59,11 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             "1f548812c68d61eacc37374e7e19346f0b1d813ab4fe064497c0a4dbc9726936", entries);
         collectCatalog(6, 0x29e4b0L, 11, 23,
             "93d54ecebb7110ac4c85b3e3711949d0b31c52b9e39cec976fd3462eaa2c0132", entries);
-        // The interface reached after CSE_STAY.DAT uses final method 0x243080.
-        collectCatalog(7, 0x243080L, 2, 9,
-            "a6f5c9a2908961c29af48b1aa1edbe9095458d5b62ed8e952cae0e32afffa945", entries);
+        // The adjacent interfaces reached after CSE_STAY.DAT and SEGALOGO.DAT
+        // have distinct final methods; verify their complete original tables.
+        collectCatalog(7, 0, 3, 14,
+            "55607e785b7bcb2a7b4daefc605b9887f56f4b783b45c2ed116531e46c9328ea", entries,
+            0x13d5d0L, 0x13d5f0L, 0x13d610L);
         // The object at 0x157458 exposes the first two of these adjacent
         // small interfaces in the observed boot trace. Verify all three.
         collectCatalog(5, 0, 3, 9,
@@ -94,6 +96,6 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             }
         }
         analyzeChanges(currentProgram);
-        println("Verified 256 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
+        println("Verified 257 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
     }
 }

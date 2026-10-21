@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Identify a target observed while a verified original MWo3 overlay is active.
+// Identify an entry reached or referenced while a verified MWo3 overlay is active.
 // @category YakuzaResearch
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.CodeUnit;
@@ -27,7 +27,7 @@ public class SeedOverlayIndirect extends GhidraScript {
                 throw new IllegalStateException("Cannot identify original overlay target");
         }
         currentProgram.getListing().setComment(entry, CodeUnit.PLATE_COMMENT,
-            "Observed indirect target with the original overlay fingerprint verified in RAM; bytes preserved.");
+            "Original entry from a verified boot target or method table; bytes preserved.");
         analyzeChanges(currentProgram);
         println("Identified observed original overlay entry " + entry);
     }
