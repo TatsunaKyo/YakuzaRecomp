@@ -32,11 +32,11 @@ The fourth supplied bundle covers `/MEDIA/TALK/NOWLOADING/TALK_NOWLOADING.BIN` a
 
 The fifth supplied bundle covers `/MEDIA/CSE/BRI/CSE_STAY.DAT` at OGRE.CVM offset `0x10ce800`. Its 43008-byte read completes, including padding around the 42864-byte payload. Further interface-method translations get through the next observed callbacks.
 
-The next traced read covers `/MEDIA/MISSION/MSSN10XX/MSSN1000.DAT` in OGRE.CVM. Its payload is 1040 bytes; the original request reads one 2048-byte sector (2 KiB) including padding. Collect that exact range with:
+The sixth supplied bundle covers `/MEDIA/MISSION/MSSN10XX/MSSN1000.DAT` at `OGRE.CVM:0x31f0000:0x800`. Its 2048-byte sector read completes, including padding around the 1040-byte payload.
 
-```powershell
-py -3 .\disc_ranges.py collect --iso "E:\Games\Yakuza (Europe).iso.gz" --range "OGRE.CVM:0x31f0000:0x800" --output ".\yakuza-boot-data-6.zip"
-```
+The seventh through ninth bundles supply `SEGALOGO.DAT` at `OGRE.CVM:0x8d1000:0x51000`, `TALK_MEMCARD.BIN` at `OGRE.CVM:0x207a0000:0x14000` and `MSSN1010.DAT` at `OGRE.CVM:0x31f1800:0x800`. All nine requested asset reads complete. The original memory-card dialog is readable after the VIF transfer correction.
+
+The opening-movie worker then requests the first 1 MiB of `/MEDIA2/MOVIE/SEGALOGO.SFD` at `OGRE2.CVM:0x97664800:0x100000`. Bundle 10 supplies this range. The movie's full indexed size is 30283776 bytes; supplying its first chunk does not establish successful playback.
 
 ## Import and run internally
 

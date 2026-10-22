@@ -128,7 +128,7 @@ Pass `--previous-supplement /path/to/earlier-pass` when preparing a later supple
 
 The graphics method at `0x0018fda0` is referenced by the original vtable word at `0x0013a914`. Its bytes were already decoded at the end of another chunk, but had no callable registration. [SeedGraphicsEntry.java](../tools/ghidra/SeedGraphicsEntry.java) checks the vtable pointer before classifying the function. The supplemental generator's `--entry 0x18fda0` preserves that newly identified entry even though no new instruction bytes were discovered. It does not replace the original method's return value with an invented result.
 
-[SeedObservedEntry.java](../tools/ghidra/SeedObservedEntry.java) handles additional indirect entries observed in verified boot traces. It checks the original first instruction before changing analysis metadata and rejects conflicts with classified functions. The current callback at `0x0017eb40` came from a runtime JALR target. Its original code now executes and reaches the PAL_NTSC.DAT read.
+[SeedObservedEntry.java](../tools/ghidra/SeedObservedEntry.java) handles additional indirect entries observed in verified boot traces. It checks the original first instruction before changing analysis metadata and rejects conflicts with classified functions. Earlier callback `0x0017eb40` came from a runtime JALR target; its original code then reached the PAL_NTSC.DAT read. After the first opening-movie chunk loaded, another JALR reached callback `0x001b9af0`. Seeding its distinct ten-instruction range preserves every prior callable address. The entire supplied 1 MiB movie chunk matches its copy in EE RAM; this verifies transport, while decoding and presentation remain unverified.
 
 ## PAL native memory layout
 

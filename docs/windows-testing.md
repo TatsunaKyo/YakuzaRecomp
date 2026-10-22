@@ -6,7 +6,7 @@ Current evidence:
 
 | Check | Result |
 | --- | --- |
-| Native Linux build and 27 Python format tests | Passed |
+| Native Linux build and 45 Python tests | Passed |
 | Overlay loader swapping, bounds and BSS tests on Linux | Passed |
 | Original 11 overlays loaded into RAM; three translated routines on Linux | 768 cases passed; hardware/constructors/gameplay untested |
 | Four upstream IOP test programs on Linux | Passed |
@@ -15,12 +15,12 @@ Current evidence:
 | LLVM-MinGW cross-build of overlay tests and translated routine probe | Passed; execution pending |
 | Windows PE inspection | x86-64 console executable; only Windows system/UCRT DLL imports |
 | Original game execution on actual Windows | Pending |
-| GitHub Actions Windows/MSVC default build and tests | Passed for c663375; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39410019090) |
-| Full-runtime Windows/MSVC host build and invalid-input execution | Passed with synthetic code; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39412718445) |
-| Full-runtime resident/MAIN boot-probe cross-link | Passed on Linux and Windows x64 |
-| Original PAL loader to verified MAIN entry on Linux | Passed; continued MAIN initialization remains under investigation |
+| GitHub Actions Windows/MSVC and Linux default build and tests | Passed for 90e89b4; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39774270977) |
+| Full-runtime Windows/MSVC host build and six host checks | Passed with synthetic code: recursive dispatch, priority results, resume-then-wake results, VIF uploads, overlay activation and invalid-input handling; same CI run |
+| Full-runtime resident/MAIN and complete GAME boot-probe cross-link | Passed on Linux and Windows x64 |
+| Original PAL loader to verified MAIN entry on Linux | Passed; continued execution loads GAME and reaches the opening-movie read |
 | Original MAIN disc read, DMA and IOP module-start path on Linux | All nine IRX.DAT drivers started |
-| PAL graphics allocation and display-mode setup call on Linux | Reached after correcting the native helper memory layout; rendering remains unverified |
+| Original memory-card dialog on Linux | Readable; complete 32 KiB glyph texture and 64-byte palette match original EE upload sources |
 | Game boot, rendering, sound, input and gameplay | Pending |
 
 ## Running the Windows diagnostic
@@ -33,7 +33,9 @@ Unzip the diagnostic package, open PowerShell in that folder, and run:
 .\yakuza_iop_probe.exe "D:\Yakuza PAL\IRX.DAT" > probe.txt 2>&1
 ```
 
-The Linux baseline ends with nine loaded modules, 15 threads and eight RPC servers. Start results 0 and 2 both represent resident modules. A driver initialization message about SIF not being initialized is present in the minimal-host baseline; full EE/IOP SIF integration has not been tested.
+The minimal Linux diagnostic baseline ends with nine loaded modules, 15 threads and eight RPC servers. Start results 0 and 2 both represent resident modules. A driver initialization message about SIF not being initialized is present in this minimal host. Separately, continued original-game execution in the full Linux host loads all nine modules through the original EE-to-IOP DMA and module-start path; this does not verify every SIF service.
+
+The private Windows full-game host currently cross-builds with FFmpeg disabled, so MPEG decoding is unavailable in that build. The Linux host enables FFmpeg. Original movie playback remains unverified on either platform, and Windows execution with the original game data remains pending.
 
 If testing is requested on Windows, the useful result is probe.txt plus the program's exit code and Windows version. There is no need for the player to install Linux or WSL.
 
