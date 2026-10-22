@@ -23,6 +23,7 @@ Current evidence:
 | Original PAL loader to verified MAIN entry on Linux | Passed; continued execution loads GAME and reaches the opening-movie read |
 | Original MAIN disc read, DMA and IOP module-start path on Linux | All nine IRX.DAT drivers started |
 | Original memory-card dialog on Linux | Readable; complete 32 KiB glyph texture and 64-byte palette match original EE upload sources |
+| Verified movie-driver interfaces in the original-code host | Linux and Windows x64 cross-link with all 98 method slots registered. Linux passes the observed callbacks and reaches the next mission-data read after host Start input; Windows game execution remains pending |
 | Game boot, rendering, sound, input and gameplay | Pending |
 
 ## Running the Windows diagnostic
