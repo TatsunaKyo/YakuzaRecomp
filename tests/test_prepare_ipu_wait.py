@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from prepare_ipu_wait import corrected, OLD, NEW
+from prepare_ipu_wait import corrected, OLD, NEW, TOP_OLD
 
 
 class IpuWaitPreparation(unittest.TestCase):
@@ -23,6 +23,16 @@ class IpuWaitPreparation(unittest.TestCase):
                      self.after.replace(b">=", b">")):
             with self.assertRaises(ValueError):
                 corrected(data, *self.hashes)
+
+    def test_top_wait_corrects_a_separate_register_and_branch(self):
+        before = (TOP_OLD + "\n").encode()
+        new = TOP_OLD.replace("GPR_S32", "GPR_S64")
+        after = (new + "\n").encode()
+        hashes = tuple(hashlib.sha256(s).hexdigest() for s in (before, after))
+        self.assertEqual(corrected(before, *hashes, TOP_OLD, new), after)
+        self.assertEqual(corrected(after, *hashes, TOP_OLD, new), after)
+        with self.assertRaises(ValueError):
+            corrected(before.replace(b"ctx, 4", b"ctx, 2"), *hashes, TOP_OLD, new)
 
 
 if __name__ == "__main__":

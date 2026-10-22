@@ -36,6 +36,10 @@ SOURCE_FILES = [
     "include/yakuza/ipu_bitstream.h", "src/ipu_bitstream.cpp", "tests/test_boot_ipu.cpp",
     "tools/prepare_ipu.py", "tools/prepare_ipu_wait.py", "tests/test_prepare_ipu_wait.py",
     "tools/ghidra/SeedMpegPictureCases.java",
+    "tools/ghidra/SeedMpegMotionEntry.java",
+    "tools/ghidra/SeedMpegMotionTable.java",
+    "third_party/pcsx2/mpeg2_vlc.h", "third_party/pcsx2/README.md",
+    "third_party/pcsx2/ipu_idct.h", "include/yakuza/ipu_block.h", "src/ipu_block.cpp",
     "tests/fixtures/boot-host/register_functions.cpp", "tests/fixtures/boot-host/synthetic_entry.cpp",
     "tests/fixtures/boot-host/ps2_recompiled_functions.h", "tests/fixtures/boot-host/ps2_recompiled_stubs.h",
 ]

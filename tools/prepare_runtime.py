@@ -11,7 +11,7 @@ from pathlib import Path
 
 from prepare_game import require
 from prepare_vif import adapt_vif
-from prepare_ipu import adapt_ipu
+from prepare_ipu import adapt_ipu, adapt_ipu_faults
 
 HASHES = {
     "Kernel/Syscalls/Helpers/State.h": "88a8a4b4991b87fe052a4d3555facbb355207dd8572eaa1ff978c1fc712bf6c4",
@@ -83,7 +83,7 @@ def main():
     // Only an explicit guest return to fallthroughPc completes a call. Native
     // SDK wrappers set PC to the caller before invoking their service.
 """)
-    texts["ps2_runtime.cpp"] = runtime
+    texts["ps2_runtime.cpp"] = adapt_ipu_faults(runtime)
     thread = texts["Kernel/Syscalls/Thread.cpp"]
     thread = replace(thread, """            const int result = ee.changePriority(id, priority, interruptSafe, oldPriority);
             setReturnS32(ctx, result);

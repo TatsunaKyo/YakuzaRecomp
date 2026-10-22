@@ -83,7 +83,7 @@ void dump_graphics(PS2Runtime& runtime, const std::filesystem::path& folder) {
     std::filesystem::create_directories(folder);
     const auto ipu = yakuza::ipuFor(&runtime.memory()).snapshot();
     std::ofstream ipu_trace(folder / "ipu-state.txt");
-    ipu_trace << std::hex << "command=" << ipu.command << " result=" << ipu.result
+    ipu_trace << std::hex << "command=" << ipu.command << " result=" << ipu.result << " control=" << ipu.control
               << " input_chcr=" << ipu.input_chcr << " madr=" << ipu.input_madr
               << " qwc=" << ipu.input_qwc << " tadr=" << ipu.input_tadr
               << " output_chcr=" << ipu.output_chcr << " output_madr=" << ipu.output_madr

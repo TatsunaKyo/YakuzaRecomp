@@ -26,7 +26,7 @@ add_library(yakuza_disc_ranges src/disc_ranges.cpp)
 target_compile_features(yakuza_disc_ranges PUBLIC cxx_std_20)
 target_include_directories(yakuza_disc_ranges PUBLIC include)
 
-add_library(yakuza_ipu src/ipu_bitstream.cpp)
+add_library(yakuza_ipu src/ipu_bitstream.cpp src/ipu_block.cpp)
 target_compile_features(yakuza_ipu PUBLIC cxx_std_20)
 target_include_directories(yakuza_ipu PUBLIC include)
 
