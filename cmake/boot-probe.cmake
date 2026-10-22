@@ -7,6 +7,7 @@ set(PS2X_ENABLE_DEBUG_UI OFF CACHE BOOL "Boot probe has no optional debug UI" FO
 set(PS2X_ENABLE_AGRESSIVE_LOGS OFF CACHE BOOL "Bound logs during boot tracing" FORCE)
 set(PS2X_ENABLE_IOP_RPC_TRACE ON CACHE BOOL "Keep missing RPC diagnostics" FORCE)
 add_subdirectory("${ps2recomp_SOURCE_DIR}/ps2xRuntime" "${CMAKE_BINARY_DIR}/ps2-runtime" EXCLUDE_FROM_ALL)
+target_link_libraries(ps2_runtime PRIVATE yakuza_ipu)
 if(NOT MSVC)
     target_compile_options(ps2_runtime PUBLIC -msse4.1)
 endif()
@@ -15,6 +16,7 @@ set(runtime_private "${CMAKE_CURRENT_BINARY_DIR}/runtime-private")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_vif.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_ipu.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/config/pal-runtime-layout.json")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
     --runtime-dir "${ps2recomp_SOURCE_DIR}/ps2xRuntime" --out-dir "${runtime_private}"
@@ -43,6 +45,11 @@ if(YAKUZA_BOOT_SUPPLEMENT_DIR)
         "${YAKUZA_BOOT_SUPPLEMENT_DIR}/register_functions.cpp")
 endif()
 file(MAKE_DIRECTORY "${boot_private}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_ipu_wait.py")
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_ipu_wait.py"
+    --generated-dir "${YAKUZA_MAIN_GENERATED_DIR}" --out-dir "${boot_private}"
+    COMMAND_ERROR_IS_FATAL ANY)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot.py"
     "${YAKUZA_MAIN_GENERATED_DIR}/register_functions.cpp")
@@ -131,6 +138,11 @@ if(BUILD_TESTING)
     target_link_libraries(boot_vif_tests PRIVATE ps2_runtime)
     target_include_directories(boot_vif_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
     add_test(NAME boot_vif COMMAND boot_vif_tests)
+    add_executable(boot_ipu_tests tests/test_boot_ipu.cpp
+        tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
+    target_link_libraries(boot_ipu_tests PRIVATE ps2_runtime)
+    target_include_directories(boot_ipu_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
+    add_test(NAME boot_ipu COMMAND boot_ipu_tests)
     add_executable(boot_overlay_tests tests/test_boot_overlays.cpp
         tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
     target_link_libraries(boot_overlay_tests PRIVATE yakuza_boot_overlay_dispatch ps2_runtime)

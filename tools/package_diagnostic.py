@@ -33,6 +33,9 @@ SOURCE_FILES = [
     "tests/test_prepare_boot_overlays.py", "tests/test_boot_overlays.cpp",
     "tests/test_boot_vif.cpp",
     "tests/test_boot_resume.cpp",
+    "include/yakuza/ipu_bitstream.h", "src/ipu_bitstream.cpp", "tests/test_boot_ipu.cpp",
+    "tools/prepare_ipu.py", "tools/prepare_ipu_wait.py", "tests/test_prepare_ipu_wait.py",
+    "tools/ghidra/SeedMpegPictureCases.java",
     "tests/fixtures/boot-host/register_functions.cpp", "tests/fixtures/boot-host/synthetic_entry.cpp",
     "tests/fixtures/boot-host/ps2_recompiled_functions.h", "tests/fixtures/boot-host/ps2_recompiled_stubs.h",
 ]

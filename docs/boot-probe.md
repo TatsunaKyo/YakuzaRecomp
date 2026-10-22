@@ -106,6 +106,18 @@ Remove-Item Env:YAKUZA_BOOT_DUMP_GS
 
 With `YAKUZA_BOOT_TRACE_MOVIE=1`, the continued probe also traces selected original PAL movie and thread calls. It logs bounded samples, caller/argument addresses, movie mode and queue state, and final call totals. Each observer invokes the original entry once and retains scheduler continuations. A return trace with `returned=0` can indicate a yield or a transfer to another decoded chunk. Thread snapshots include suspend/wakeup counts and callback depth. This diagnostic is disabled by default.
 
+## IPU input and the MPEG wait helper
+
+With the supplied movie input, the original parser stalled while searching for an MPEG start code. Its cached input was `0x40000008`, the FDEC command it had issued. The pinned memory handler stored the command word and returned it as decoded data; it did not consume an IPU input stream.
+
+[prepare_ipu.py](../tools/prepare_ipu.py) connects the private memory implementation to [ipu_bitstream.cpp](../src/ipu_bitstream.cpp). The input path handles CPU FIFO delivery, fixed-length bit peeks/advances, input waits, bit position, reset and quantization/VQ table input. Normal and supported source-chain TO_IPU transfers retain FIFO backpressure, update MADR/QWC/TADR and report actual DMA completion. The regression exercises synthetic MPEG start codes, unaligned reads across qwords, empty-input BUSY, normal DMA, REF/END chains, table consumption and out-of-bounds rejection. It fails against the previous memory handler and passes with the adaptation.
+
+The original wait helper loads the 64-bit IPU_CMD DATA/BUSY pair, then tests its sign. The pinned translation used `GPR_S32` for the BGEZL at `0x0012a678`, ignoring BUSY in bit 63. [prepare_ipu_wait.py](../tools/prepare_ipu_wait.py) verifies the complete generated helper by SHA-256, preserves its original generated source privately and changes that native condition to `GPR_S64`. It rejects other source changes and is idempotent. Original MIPS instructions remain unchanged.
+
+An original-game run with both corrections passes the start-code loop and reaches picture dispatch. [SeedMpegPictureCases.java](../tools/ghidra/SeedMpegPictureCases.java) verifies the original JR and all five table words at `0x00139db0` before identifying the four distinct branch entries. This retains every previously callable address and adds the missing picture cases and their continuations.
+
+This input path does not implement complete IPU picture decoding. Unsupported picture, variable-length and conversion commands stop explicitly; they do not return invented frames. Original movie decoding and presentation remain unverified.
+
 ## Host controller adapter
 
 The original PAL device bus uses DBC_Manager and ds2u_d, rather than the standard libpad calls. The adapter observes successful original controller-open RPC replies and retains their actual port/handle mapping. It leaves original IOP module loading and open operations intact. Three identified SDK calls use the host backend for the first logical port: readiness at `0x001263a0`, capabilities at `0x001262d0` and input data at `0x001261f8`. The original SDK active-handle flag must still be set.
@@ -130,7 +142,7 @@ The graphics method at `0x0018fda0` is referenced by the original vtable word at
 
 [SeedObservedEntry.java](../tools/ghidra/SeedObservedEntry.java) handles additional indirect entries observed in verified boot traces. It checks the original first instruction before changing analysis metadata and rejects conflicts with classified functions. Earlier callback `0x0017eb40` came from a runtime JALR target; its original code then reached the PAL_NTSC.DAT read. After the first opening-movie chunk loaded, another JALR reached callback `0x001b9af0`. Seeding its distinct ten-instruction range preserves every prior callable address. The entire supplied 1 MiB movie chunk matches its copy in EE RAM; this verifies transport, while decoding and presentation remain unverified.
 
-The next original-game run passes that callback and reaches the following movie read at `OGRE2.CVM:0x97764800:0x31000`. Both native Linux and Windows cross-builds include this callback; the six Linux runtime checks pass. The new run stops for the missing original range, with no missing dispatch target.
+The next original-game run passes that callback and reaches the following movie read at `OGRE2.CVM:0x97764800:0x31000`. Bundle 11 now supplies this 196 KiB refill, which also matches its entire copy in EE RAM. Execution then reaches callback `0x001f7598` from JALR `0x001f86e4`. Seeding its original seven-instruction range retains all 331,612 previously callable resident/MAIN addresses and adds this entry without changing guest instructions.
 
 ## PAL native memory layout
 

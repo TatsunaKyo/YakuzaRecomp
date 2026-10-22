@@ -6,7 +6,7 @@ Current evidence:
 
 | Check | Result |
 | --- | --- |
-| Native Linux build and 45 Python tests | Passed |
+| Native Linux build and 47 Python tests | Passed |
 | Overlay loader swapping, bounds and BSS tests on Linux | Passed |
 | Original 11 overlays loaded into RAM; three translated routines on Linux | 768 cases passed; hardware/constructors/gameplay untested |
 | Four upstream IOP test programs on Linux | Passed |
@@ -17,6 +17,7 @@ Current evidence:
 | Original game execution on actual Windows | Pending |
 | GitHub Actions Windows/MSVC and Linux default build and tests | Passed for 90e89b4; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39774270977) |
 | Full-runtime Windows/MSVC host build and six host checks | Passed with synthetic code: recursive dispatch, priority results, resume-then-wake results, VIF uploads, overlay activation and invalid-input handling; same CI run |
+| IPU input regression on Linux and Windows cross-build | Passed on Linux; Windows x64 test executable cross-builds. Complete IPU picture decoding remains unimplemented |
 | Full-runtime resident/MAIN and complete GAME boot-probe cross-link | Passed on Linux and Windows x64 |
 | Original PAL loader to verified MAIN entry on Linux | Passed; continued execution loads GAME and reaches the opening-movie read |
 | Original MAIN disc read, DMA and IOP module-start path on Linux | All nine IRX.DAT drivers started |

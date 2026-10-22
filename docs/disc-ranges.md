@@ -38,11 +38,7 @@ The seventh through ninth bundles supply `SEGALOGO.DAT` at `OGRE.CVM:0x8d1000:0x
 
 The opening-movie worker then requests the first 1 MiB of `/MEDIA2/MOVIE/SEGALOGO.SFD` at `OGRE2.CVM:0x97664800:0x100000`. Bundle 10 supplies this range. The movie's full indexed size is 30283776 bytes; supplying its first chunk does not establish successful playback.
 
-After translating the next observed movie callback, execution requests the following 200704 bytes (196 KiB) at `OGRE2.CVM:0x97764800:0x31000`. Collect this next observed range with your actual image path:
-
-```powershell
-py -3 .\disc_ranges.py collect --iso "E:\Games\Yakuza (Europe).iso.gz" --range "OGRE2.CVM:0x97764800:0x31000" --output ".\yakuza-boot-data-11.zip"
-```
+After translating the next observed movie callback, execution requests the following 200704 bytes (196 KiB) at `OGRE2.CVM:0x97764800:0x31000`. Bundle 11 supplies this range. Both reads complete, and all supplied bytes match their copies in emulated EE RAM. Execution then reaches another indirect callback in the original stream-processing code.
 
 ## Import and run internally
 

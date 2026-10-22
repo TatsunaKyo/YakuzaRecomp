@@ -11,6 +11,7 @@ from pathlib import Path
 
 from prepare_game import require
 from prepare_vif import adapt_vif
+from prepare_ipu import adapt_ipu
 
 HASHES = {
     "Kernel/Syscalls/Helpers/State.h": "88a8a4b4991b87fe052a4d3555facbb355207dd8572eaa1ff978c1fc712bf6c4",
@@ -106,6 +107,7 @@ def main():
             "Unsupported runtime header: runtime/ps2_memory.h")
     texts["ps2_vif1_interpreter.cpp"], texts["ps2_memory.cpp"], memory_header = adapt_vif(
         texts["ps2_vif1_interpreter.cpp"], texts["ps2_memory.cpp"], memory_header.decode())
+    texts["ps2_memory.cpp"] = adapt_ipu(texts["ps2_memory.cpp"])
     # Copy the complete include tree so quoted sibling includes and PCHs see
     # the same adapted PS2Memory layout in every translation unit.
     for path in include.rglob("*"):
@@ -128,7 +130,7 @@ def main():
     save(output / "pal_runtime_layout.h", header.encode())
     save(output / "adaptation.json", (json.dumps({"source_sha256": HASHES,
         "memory_header_sha256": MEMORY_HEADER_SHA256, "layout": layout}, indent=2) + "\n").encode())
-    print("Prepared private PAL runtime: heaps, recursive yields, priority returns and VIF DIRECT boundaries")
+    print("Prepared private PAL runtime: heaps, recursive yields, syscall results, VIF and IPU input")
 
 
 if __name__ == "__main__": main()

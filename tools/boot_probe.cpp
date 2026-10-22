@@ -6,6 +6,7 @@
 #include "ps2_recompiled_functions.h"
 #include "yakuza/pal_boot_hooks.h"
 #include "yakuza/boot_overlays.h"
+#include "yakuza/ipu_bitstream.h"
 #include "pal_runtime_layout.h"
 #include <atomic>
 #include <array>
@@ -80,6 +81,18 @@ void install_movie_trace(PS2Runtime& runtime) {
 }
 void dump_graphics(PS2Runtime& runtime, const std::filesystem::path& folder) {
     std::filesystem::create_directories(folder);
+    const auto ipu = yakuza::ipuFor(&runtime.memory()).snapshot();
+    std::ofstream ipu_trace(folder / "ipu-state.txt");
+    ipu_trace << std::hex << "command=" << ipu.command << " result=" << ipu.result
+              << " input_chcr=" << ipu.input_chcr << " madr=" << ipu.input_madr
+              << " qwc=" << ipu.input_qwc << " tadr=" << ipu.input_tadr
+              << " output_chcr=" << ipu.output_chcr << " output_madr=" << ipu.output_madr
+              << " output_qwc=" << ipu.output_qwc << std::dec << " busy=" << ipu.busy
+              << " bp=" << ipu.position << " fifo=" << ipu.input_fifo << " internal=" << ipu.internal
+              << " cpu_qw=" << ipu.cpu_quadwords << " dma_qw=" << ipu.dma_quadwords << '\n';
+    for (unsigned i = 0; i < ipu.commands.size(); ++i)
+        ipu_trace << "command_" << i << "=" << ipu.commands[i] << '\n';
+    if (!ipu_trace) throw std::runtime_error("Cannot write private IPU state");
     std::ofstream trace(folder / "gs-trace.txt");
     const auto snapshot = runtime.gs().getDebugSnapshot();
     for (unsigned i = 0; i < 2; ++i) {

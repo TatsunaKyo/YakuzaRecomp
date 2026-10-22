@@ -26,6 +26,10 @@ add_library(yakuza_disc_ranges src/disc_ranges.cpp)
 target_compile_features(yakuza_disc_ranges PUBLIC cxx_std_20)
 target_include_directories(yakuza_disc_ranges PUBLIC include)
 
+add_library(yakuza_ipu src/ipu_bitstream.cpp)
+target_compile_features(yakuza_ipu PUBLIC cxx_std_20)
+target_include_directories(yakuza_ipu PUBLIC include)
+
 set(YAKUZA_OVERLAY_ANALYSIS_DIR "" CACHE PATH "Private, verified overlay analysis directory")
 if(YAKUZA_OVERLAY_ANALYSIS_DIR)
     set(overlay_samples)
