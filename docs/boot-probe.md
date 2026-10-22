@@ -132,7 +132,7 @@ The original motion-compensation helper at `0x0012ac78` builds REF/REFE tags and
 
 [prepare_spr.py](../tools/prepare_spr.py) connects the verified private memory implementation to [scratchpad_dma.cpp](../src/scratchpad_dma.cpp). It transfers REF/REFE and supported inline/jump tags, wraps the scratchpad address, advances MADR/QWC/TADR/SADR and signals actual completion. Tests exercise tag bytes versus payload bytes, CNT/NEXT/END, TIE/IRQ termination, scratchpad-resident tags, invalid source bounds and native errors through the real runtime store helper. Unsupported modes stop explicitly. Ordinary guest address faults retain their existing behavior.
 
-With this correction, a recovered column-major Y/Cb/Cr frame matches frame 31 of an independent MPEG decode: 2,788 of 294,912 samples differ, with a maximum difference of one. That verifies one frame rather than complete playback. Longer development captures can request up to 1,800 seconds; the default remains 15 seconds.
+With this correction, a recovered column-major Y/Cb/Cr frame matches frame 31 of an independent MPEG decode: 2,788 of 294,912 samples differ, with a maximum difference of one. A later recovered frame matches frame 241 with the same maximum difference in all three planes. These checks verify selected decoded frames rather than complete playback. Longer development captures can request up to 1,800 seconds; the default remains 15 seconds.
 
 ## Host controller adapter
 
@@ -159,6 +159,8 @@ The graphics method at `0x0018fda0` is referenced by the original vtable word at
 [SeedObservedEntry.java](../tools/ghidra/SeedObservedEntry.java) handles additional indirect entries observed in verified boot traces. It checks the original first instruction before changing analysis metadata and rejects conflicts with classified functions. Earlier callback `0x0017eb40` came from a runtime JALR target; its original code then reached the PAL_NTSC.DAT read. After the first opening-movie chunk loaded, another JALR reached callback `0x001b9af0`. Seeding its distinct ten-instruction range preserves every prior callable address. The entire supplied 1 MiB movie chunk matches its copy in EE RAM; this verifies transport, while decoding and presentation remain unverified.
 
 The next original-game run passes that callback and reaches the following movie read at `OGRE2.CVM:0x97764800:0x31000`. Bundle 11 now supplies this 196 KiB refill, which also matches its entire copy in EE RAM. Execution then reaches callback `0x001f7598` from JALR `0x001f86e4`. Seeding its original seven-instruction range retains all 331,612 previously callable resident/MAIN addresses and adds this entry without changing guest instructions.
+
+After the scratchpad transfer correction and native-device optimization, execution also reaches movie-output callback `0x001d6160` from JALR `0x001e5bdc`. Its original return and delay-slot instructions are translated unchanged. [SeedMovieOutputCallbacks.java](../tools/ghidra/SeedMovieOutputCallbacks.java) verifies all 42 pointers across three original interface tables before identifying eleven other missing entries. Changed-table checks reject altered data before creating functions, and a supported repeat creates no new entries. Registration retains all prior callable addresses and includes every verified table pointer.
 
 ## PAL native memory layout
 

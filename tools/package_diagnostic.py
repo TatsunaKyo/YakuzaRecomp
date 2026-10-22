@@ -40,6 +40,7 @@ SOURCE_FILES = [
     "tools/ghidra/SeedMpegPictureCases.java",
     "tools/ghidra/SeedMpegMotionEntry.java",
     "tools/ghidra/SeedMpegMotionTable.java",
+    "tools/ghidra/SeedMovieOutputCallbacks.java",
     "third_party/pcsx2/mpeg2_vlc.h", "third_party/pcsx2/README.md",
     "third_party/pcsx2/ipu_idct.h", "include/yakuza/ipu_block.h", "src/ipu_block.cpp",
     "tests/fixtures/boot-host/register_functions.cpp", "tests/fixtures/boot-host/synthetic_entry.cpp",
