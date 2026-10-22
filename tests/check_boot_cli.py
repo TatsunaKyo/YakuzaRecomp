@@ -22,5 +22,6 @@ with tempfile.TemporaryDirectory(prefix="Yakuza PAL ü ") as folder:
     (root / "SLES_541.71").write_bytes(b"not an ELF")
     (root / "MAIN.BIN").write_bytes(b"not a game overlay")
     rejects([folder], "Unsupported PAL input size")
-    rejects([folder, "0"], "Time limit must be 1..120 seconds")
+    rejects([folder, "0"], "Time limit must be 1..1800 seconds")
+    rejects([folder, "1801"], "Time limit must be 1..1800 seconds")
 print("Boot host CLI rejected missing, truncated and invalid-limit inputs before graphics startup")

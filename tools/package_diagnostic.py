@@ -35,6 +35,8 @@ SOURCE_FILES = [
     "tests/test_boot_resume.cpp",
     "include/yakuza/ipu_bitstream.h", "src/ipu_bitstream.cpp", "tests/test_boot_ipu.cpp",
     "tools/prepare_ipu.py", "tools/prepare_ipu_wait.py", "tests/test_prepare_ipu_wait.py",
+    "include/yakuza/native_device_error.h", "include/yakuza/scratchpad_dma.h",
+    "src/scratchpad_dma.cpp", "tools/prepare_spr.py", "tests/test_boot_spr.cpp",
     "tools/ghidra/SeedMpegPictureCases.java",
     "tools/ghidra/SeedMpegMotionEntry.java",
     "tools/ghidra/SeedMpegMotionTable.java",

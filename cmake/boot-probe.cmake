@@ -7,7 +7,7 @@ set(PS2X_ENABLE_DEBUG_UI OFF CACHE BOOL "Boot probe has no optional debug UI" FO
 set(PS2X_ENABLE_AGRESSIVE_LOGS OFF CACHE BOOL "Bound logs during boot tracing" FORCE)
 set(PS2X_ENABLE_IOP_RPC_TRACE ON CACHE BOOL "Keep missing RPC diagnostics" FORCE)
 add_subdirectory("${ps2recomp_SOURCE_DIR}/ps2xRuntime" "${CMAKE_BINARY_DIR}/ps2-runtime" EXCLUDE_FROM_ALL)
-target_link_libraries(ps2_runtime PRIVATE yakuza_ipu)
+target_link_libraries(ps2_runtime PRIVATE yakuza_ipu yakuza_scratchpad_dma)
 if(NOT MSVC)
     target_compile_options(ps2_runtime PUBLIC -msse4.1)
 endif()
@@ -17,6 +17,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_vif.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_ipu.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_spr.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/config/pal-runtime-layout.json")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
     --runtime-dir "${ps2recomp_SOURCE_DIR}/ps2xRuntime" --out-dir "${runtime_private}"
@@ -143,6 +144,11 @@ if(BUILD_TESTING)
     target_link_libraries(boot_ipu_tests PRIVATE ps2_runtime)
     target_include_directories(boot_ipu_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
     add_test(NAME boot_ipu COMMAND boot_ipu_tests)
+    add_executable(boot_spr_tests tests/test_boot_spr.cpp
+        tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
+    target_link_libraries(boot_spr_tests PRIVATE ps2_runtime yakuza_scratchpad_dma)
+    target_include_directories(boot_spr_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
+    add_test(NAME boot_spr COMMAND boot_spr_tests)
     add_executable(boot_overlay_tests tests/test_boot_overlays.cpp
         tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
     target_link_libraries(boot_overlay_tests PRIVATE yakuza_boot_overlay_dispatch ps2_runtime)

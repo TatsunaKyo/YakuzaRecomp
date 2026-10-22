@@ -18,6 +18,7 @@ Current evidence:
 | GitHub Actions Windows/MSVC and Linux default build and tests | Passed for a27c8a3; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39838465814) |
 | Full-runtime Windows/MSVC host build and seven host checks | Passed with synthetic code, including IPU block/IDCT and DMA checks; same CI run |
 | IPU MPEG blocks and RGB32 conversion on Linux and Windows cross-build | Golden pixel and DMA checks pass on Linux; Windows x64 host/test executables cross-build. Original movie playback remains unverified |
+| Scratchpad source-chain DMA and native error regression | Failed before the correction; passes on Linux. The current Windows host and all eight synthetic host programs cross-build; execution of this new test on Windows is pending |
 | Full-runtime resident/MAIN and complete GAME boot-probe cross-link | Passed on Linux and Windows x64 |
 | Original PAL loader to verified MAIN entry on Linux | Passed; continued execution loads GAME and reaches the opening-movie read |
 | Original MAIN disc read, DMA and IOP module-start path on Linux | All nine IRX.DAT drivers started |

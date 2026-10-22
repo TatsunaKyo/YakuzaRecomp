@@ -8,7 +8,7 @@ def adapt_ipu_faults(runtime):
     if runtime.count(include) != 1 or runtime.count(catch) != 10:
         raise ValueError("Pinned runtime memory-fault handlers differ; reassess")
     runtime = runtime.replace(include, include + '\n#include "yakuza/ipu_bitstream.h"')
-    return runtime.replace(catch, '    catch (const yakuza::IpuError&) { throw; }\n' + catch)
+    return runtime.replace(catch, '    catch (const yakuza::NativeDeviceError&) { throw; }\n' + catch)
 
 
 def adapt_ipu(memory):

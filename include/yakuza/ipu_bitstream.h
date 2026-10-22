@@ -8,12 +8,13 @@
 #include <unordered_map>
 #include <functional>
 #include "yakuza/ipu_block.h"
+#include "yakuza/native_device_error.h"
 
 namespace yakuza {
 // A missing native device capability must not become an EE address exception.
-class IpuError : public std::runtime_error {
+class IpuError : public NativeDeviceError {
 public:
-    using std::runtime_error::runtime_error;
+    using NativeDeviceError::NativeDeviceError;
 };
 // EE IPU transport, MPEG symbols, BDEC macroblocks and RGB32 CSC.
 // IDEC, RGB16 CSC and PACK remain explicitly unsupported.

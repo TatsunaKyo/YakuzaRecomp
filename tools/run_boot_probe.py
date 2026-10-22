@@ -31,7 +31,7 @@ def main():
     parser.add_argument("--xvfb", type=Path)
     parser.add_argument("--continue-main", action="store_true")
     args = parser.parse_args()
-    require(1 <= args.seconds <= 120 and args.exe.is_file(), "Invalid time limit or missing executable")
+    require(1 <= args.seconds <= 1800 and args.exe.is_file(), "Invalid time limit or missing executable")
     require(not args.out_dir.resolve().is_relative_to(Path(__file__).resolve().parents[1]),
             "Keep boot traces outside the source checkout")
     for name, expected in PAL_INPUTS.items():

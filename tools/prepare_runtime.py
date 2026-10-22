@@ -12,6 +12,7 @@ from pathlib import Path
 from prepare_game import require
 from prepare_vif import adapt_vif
 from prepare_ipu import adapt_ipu, adapt_ipu_faults
+from prepare_spr import adapt_spr
 
 HASHES = {
     "Kernel/Syscalls/Helpers/State.h": "88a8a4b4991b87fe052a4d3555facbb355207dd8572eaa1ff978c1fc712bf6c4",
@@ -107,7 +108,7 @@ def main():
             "Unsupported runtime header: runtime/ps2_memory.h")
     texts["ps2_vif1_interpreter.cpp"], texts["ps2_memory.cpp"], memory_header = adapt_vif(
         texts["ps2_vif1_interpreter.cpp"], texts["ps2_memory.cpp"], memory_header.decode())
-    texts["ps2_memory.cpp"] = adapt_ipu(texts["ps2_memory.cpp"])
+    texts["ps2_memory.cpp"] = adapt_spr(adapt_ipu(texts["ps2_memory.cpp"]))
     # Copy the complete include tree so quoted sibling includes and PCHs see
     # the same adapted PS2Memory layout in every translation unit.
     for path in include.rglob("*"):

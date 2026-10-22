@@ -242,12 +242,12 @@ int main(int argc, char** argv) {
 #endif
     std::cout << std::unitbuf;
     if (argc < 2 || argc > 5) {
-        std::cerr << "Usage: yakuza_boot_probe <original PAL disc folder> [max seconds, 1..120] [state folder] [continue]\n";
+        std::cerr << "Usage: yakuza_boot_probe <original PAL disc folder> [max seconds, 1..1800] [state folder] [continue]\n";
         return 2;
     }
     try {
         unsigned seconds = argc >= 3 ? static_cast<unsigned>(std::stoul(argv[2])) : 15;
-        if (!seconds || seconds > 120) throw std::runtime_error("Time limit must be 1..120 seconds");
+        if (!seconds || seconds > 1800) throw std::runtime_error("Time limit must be 1..1800 seconds");
         auto state = argc >= 4 ? std::filesystem::path(argv[3]) : std::filesystem::current_path() / ".yakuza-boot-state";
         if (argc == 5) {
             if (std::filesystem::path(argv[4]) != "continue") throw std::runtime_error("Unknown boot mode");

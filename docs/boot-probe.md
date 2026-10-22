@@ -122,9 +122,17 @@ The input path also decodes macroblock addresses, picture-dependent macroblock t
 
 Original movie execution now passes BDEC output transfers and reaches its motion-compensation callbacks. [SeedMpegMotionEntry.java](../tools/ghidra/SeedMpegMotionEntry.java) verifies all 148 bytes of the observed callback before recovering code previously marked as data. [SeedMpegMotionTable.java](../tools/ghidra/SeedMpegMotionTable.java) verifies all 16 original pointers before identifying the remaining entries. Existing callable addresses and instruction bytes remain preserved.
 
-RGB32 CSC consumes the declared number of Y/Cb/Cr macroblocks and emits RGBA using the documented integer conversion and threshold rules. Tests check black/white and colored quadrants, chroma subsampling, alpha boundaries, multiple blocks, output backpressure and exact DMA counts. Original execution completes full-frame conversions and stops at the next genuinely missing movie range. This native path is shared by Linux and Windows and does not require FFmpeg.
+RGB32 CSC consumes the declared number of Y/Cb/Cr macroblocks and emits RGBA using the documented integer conversion and threshold rules. Tests check black/white and colored quadrants, chroma subsampling, alpha boundaries, multiple blocks, output backpressure and exact DMA counts. Original execution completes full-frame conversions. After bundle 12 supplied the remaining movie extent, continued runs pass the earlier missing read. This native path is shared by Linux and Windows and does not require FFmpeg.
 
 IDEC, RGB16 CSC and PACK commands remain unsupported and stop explicitly. Correct movie reconstruction and on-screen presentation remain unverified; completed DMA transfers alone do not establish correct playback.
+
+## Scratchpad source-chain DMA
+
+The original motion-compensation helper at `0x0012ac78` builds REF/REFE tags and starts channel 9 with CHCR `0x105`. The pinned runtime handled normal scratchpad copies, but ignored source chains; polling then cleared STR without transferring their bytes. A synthetic chain reproduces the missing copy before the correction.
+
+[prepare_spr.py](../tools/prepare_spr.py) connects the verified private memory implementation to [scratchpad_dma.cpp](../src/scratchpad_dma.cpp). It transfers REF/REFE and supported inline/jump tags, wraps the scratchpad address, advances MADR/QWC/TADR/SADR and signals actual completion. Tests exercise tag bytes versus payload bytes, CNT/NEXT/END, TIE/IRQ termination, scratchpad-resident tags, invalid source bounds and native errors through the real runtime store helper. Unsupported modes stop explicitly. Ordinary guest address faults retain their existing behavior.
+
+With this correction, a recovered column-major Y/Cb/Cr frame matches frame 31 of an independent MPEG decode: 2,788 of 294,912 samples differ, with a maximum difference of one. That verifies one frame rather than complete playback. Longer development captures can request up to 1,800 seconds; the default remains 15 seconds.
 
 ## Host controller adapter
 
