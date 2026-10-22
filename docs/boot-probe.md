@@ -130,6 +130,8 @@ The graphics method at `0x0018fda0` is referenced by the original vtable word at
 
 [SeedObservedEntry.java](../tools/ghidra/SeedObservedEntry.java) handles additional indirect entries observed in verified boot traces. It checks the original first instruction before changing analysis metadata and rejects conflicts with classified functions. Earlier callback `0x0017eb40` came from a runtime JALR target; its original code then reached the PAL_NTSC.DAT read. After the first opening-movie chunk loaded, another JALR reached callback `0x001b9af0`. Seeding its distinct ten-instruction range preserves every prior callable address. The entire supplied 1 MiB movie chunk matches its copy in EE RAM; this verifies transport, while decoding and presentation remain unverified.
 
+The next original-game run passes that callback and reaches the following movie read at `OGRE2.CVM:0x97764800:0x31000`. Both native Linux and Windows cross-builds include this callback; the six Linux runtime checks pass. The new run stops for the missing original range, with no missing dispatch target.
+
 ## PAL native memory layout
 
 The default runtime reserves the top 1 MiB of EE RAM for helpers. MAIN's original allocator then fails a 0x3c3500-byte graphics allocation. Its subsequent cleanup reads an invalid slot and loops. Returning the original PAL heap boundary, 0x1fe0000 below the 128 KiB main stack, makes that allocation succeed and reaches the original PAL display-mode setup call.
