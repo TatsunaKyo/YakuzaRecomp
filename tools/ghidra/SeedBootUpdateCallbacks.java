@@ -59,16 +59,20 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             "1f548812c68d61eacc37374e7e19346f0b1d813ab4fe064497c0a4dbc9726936", entries);
         collectCatalog(6, 0x29e4b0L, 11, 23,
             "93d54ecebb7110ac4c85b3e3711949d0b31c52b9e39cec976fd3462eaa2c0132", entries);
-        // The adjacent interfaces reached after CSE_STAY.DAT and SEGALOGO.DAT
-        // have distinct final methods; verify their complete original tables.
-        collectCatalog(7, 0, 3, 14,
-            "55607e785b7bcb2a7b4daefc605b9887f56f4b783b45c2ed116531e46c9328ea", entries,
-            0x13d5d0L, 0x13d5f0L, 0x13d610L);
+        // Interfaces reached after CSE_STAY.DAT, SEGALOGO.DAT and
+        // TALK_MEMCARD.BIN use distinct final methods. Verify complete tables.
+        collectCatalog(7, 0, 5, 24,
+            "f4bccc7631010e1b2a67496a39abc7cd839d579800f6c5b79037833396e96170", entries,
+            0x13d5d0L, 0x13d5f0L, 0x13d610L, 0x13da00L, 0x13dad0L);
         // The object at 0x157458 exposes the first two of these adjacent
         // small interfaces in the observed boot trace. Verify all three.
         collectCatalog(5, 0, 3, 9,
             "1744351a7c07ad76175f068618a41c1177c9b0da92433357b50cb5cd4a478ae7", entries,
             0x1427e0L, 0x142800L, 0x142820L);
+        // This larger interface is reached after the memory-card message load.
+        collectCatalog(31, 0, 1, 29,
+            "d0abe1bd38ce9377a47151d78b9fb500f01857941aa669b951a5e32d04b1070a", entries,
+            0x13da20L);
         // Validate the entire catalog before changing any analysis metadata.
         for (long target : entries) {
             Address entry = toAddr(target);
@@ -96,6 +100,6 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             }
         }
         analyzeChanges(currentProgram);
-        println("Verified 257 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
+        println("Verified 260 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
     }
 }

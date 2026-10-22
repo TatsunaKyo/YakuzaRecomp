@@ -9,10 +9,12 @@
 #include "pal_runtime_layout.h"
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <string_view>
 #include <thread>
 #ifdef _WIN32
 #include <windows.h>
@@ -22,6 +24,45 @@ namespace {
 std::atomic<bool> reached_main{false}, finished{false};
 bool continue_main = false;
 PS2Runtime::RecompiledFunction original_main = nullptr;
+void dump_graphics(PS2Runtime& runtime, const std::filesystem::path& folder) {
+    std::filesystem::create_directories(folder);
+    std::ofstream trace(folder / "gs-trace.txt");
+    const auto snapshot = runtime.gs().getDebugSnapshot();
+    for (unsigned i = 0; i < 2; ++i) {
+        const auto& ctx = snapshot.ctx[i];
+        const auto& tex = ctx.tex0;
+        trace << "context=" << i << " frame=" << ctx.frame.fbp << ',' << ctx.frame.fbw
+              << ',' << unsigned(ctx.frame.psm) << " tex=" << tex.tbp0 << ',' << unsigned(tex.tbw)
+              << ',' << unsigned(tex.psm) << ',' << unsigned(tex.tw) << ',' << unsigned(tex.th)
+              << " clut=" << tex.cbp << ',' << unsigned(tex.cpsm) << ',' << unsigned(tex.csm)
+              << ',' << unsigned(tex.csa) << ',' << unsigned(tex.cld)
+              << " clamp=" << ctx.clamp << " test=" << ctx.test << " alpha=" << ctx.alpha << '\n';
+    }
+    for (const auto& event : runtime.gs().getDebugHistory()) {
+        const auto& tex = event.tex0;
+        trace << "event=" << unsigned(event.kind) << " seq=" << event.seq << " vsync=" << event.vsyncTick
+              << " reg=" << unsigned(event.reg) << " value=" << event.regValue
+              << " prim=" << unsigned(event.prim.type) << ',' << unsigned(event.prim.tme)
+              << " frame=" << event.frame.fbp << ',' << event.frame.fbw << ',' << unsigned(event.frame.psm)
+              << " tex=" << tex.tbp0 << ',' << unsigned(tex.tbw) << ',' << unsigned(tex.psm)
+              << ',' << unsigned(tex.tw) << ',' << unsigned(tex.th)
+              << " clut=" << tex.cbp << ',' << unsigned(tex.cpsm) << ',' << unsigned(tex.csm)
+              << ',' << unsigned(tex.csa) << ',' << unsigned(tex.cld)
+              << " xy=" << event.xMin << ',' << event.xMax << ',' << event.yMin << ',' << event.yMax << '\n';
+    }
+    if (!trace) throw std::runtime_error("Cannot write private graphics trace");
+    runtime.gs().refreshDisplaySnapshot();
+    uint32_t size = 0;
+    const auto* vram = runtime.gs().lockDisplaySnapshot(size);
+    std::ofstream memory(folder / "gs-vram.bin", std::ios::binary);
+    if (vram && size) memory.write(reinterpret_cast<const char*>(vram), size);
+    runtime.gs().unlockDisplaySnapshot();
+    if (!vram || !memory || size != PS2_GS_VRAM_SIZE) throw std::runtime_error("Cannot write complete private GS memory");
+    std::ofstream ee(folder / "ee-ram.bin", std::ios::binary);
+    ee.write(reinterpret_cast<const char*>(runtime.memory().getRDRAM()), PS2_RAM_SIZE);
+    if (!ee) throw std::runtime_error("Cannot write private EE graphics source memory");
+    std::cout << "[yakuza-gs] saved private graphics trace, VRAM and EE source memory in state/graphics\n";
+}
 void verify_input(const std::filesystem::path& path, uint64_t length, uint64_t expected) {
     if (std::filesystem::file_size(path) != length) throw std::runtime_error("Unsupported PAL input size");
     std::ifstream input(path, std::ios::binary);
@@ -58,6 +99,15 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
     runtime.setMissingFunctionPolicy(PS2Runtime::MissingFunctionPolicy::Stop);
     if (!runtime.initialize("YakuzaRecomp | PAL boot development probe")) return 2;
     if (!runtime.loadELF((folder / "SLES_541.71").string())) return 2;
+#ifdef _WIN32
+    char graphics_env[2]{};
+    const bool graphics_trace = continue_main &&
+        GetEnvironmentVariableA("YAKUZA_BOOT_DUMP_GS", graphics_env, sizeof(graphics_env)) == 1 && graphics_env[0] == '1';
+#else
+    const char* graphics_env = std::getenv("YAKUZA_BOOT_DUMP_GS");
+    const bool graphics_trace = continue_main && graphics_env && std::string_view(graphics_env) == "1";
+#endif
+    if (graphics_trace) runtime.gs().setDebugHistoryPaused(false);
     auto paths = PS2Runtime::getIoPaths();
     paths.mcRoot = std::filesystem::absolute(state / "mc0");
     PS2Runtime::setIoPaths(paths);
@@ -111,6 +161,7 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
         for (unsigned reg = 1; reg < 32; ++reg)
             std::cout << "[yakuza-register] r" << reg << "=0x" << std::hex
                       << GPR_U64((&runtime.cpu()), reg) << std::dec << '\n';
+        if (graphics_trace) dump_graphics(runtime, state / "graphics");
     }
     // Continued exploration has no success end condition yet. Keep failures or
     // time limits distinct from the deliberate successful MAIN checkpoint.

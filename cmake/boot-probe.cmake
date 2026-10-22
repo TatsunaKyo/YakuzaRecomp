@@ -14,6 +14,7 @@ find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 set(runtime_private "${CMAKE_CURRENT_BINARY_DIR}/runtime-private")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_vif.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/config/pal-runtime-layout.json")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
     --runtime-dir "${ps2recomp_SOURCE_DIR}/ps2xRuntime" --out-dir "${runtime_private}"
@@ -30,6 +31,7 @@ foreach(source IN LISTS runtime_sources)
     endif()
 endforeach()
 set_property(TARGET ps2_runtime PROPERTY SOURCES "${adapted_sources}")
+target_include_directories(ps2_runtime BEFORE PUBLIC "${runtime_private}/include")
 target_include_directories(ps2_runtime BEFORE PRIVATE
     "${runtime_private}/src/lib/Kernel" "${runtime_private}/src/lib")
 set(boot_private "${CMAKE_CURRENT_BINARY_DIR}/boot-private")
@@ -76,7 +78,7 @@ target_include_directories(yakuza_boot_probe PRIVATE "${YAKUZA_MAIN_GENERATED_DI
 set_source_files_properties(tools/boot_probe.cpp src/pal_boot_hooks.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${runtime_private}")
 target_precompile_headers(yakuza_boot_probe PRIVATE
-    "${ps2recomp_SOURCE_DIR}/ps2xRuntime/include/ps2_runtime_macros.h"
+    "${runtime_private}/include/ps2_runtime_macros.h"
     "${YAKUZA_MAIN_GENERATED_DIR}/ps2_recompiled_functions.h"
     "${YAKUZA_MAIN_GENERATED_DIR}/ps2_recompiled_stubs.h")
 set_target_properties(yakuza_boot_probe PROPERTIES UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE 32)
@@ -119,6 +121,11 @@ if(BUILD_TESTING)
     target_link_libraries(boot_priority_tests PRIVATE ps2_runtime)
     target_include_directories(boot_priority_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
     add_test(NAME boot_priority COMMAND boot_priority_tests)
+    add_executable(boot_vif_tests tests/test_boot_vif.cpp
+        tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
+    target_link_libraries(boot_vif_tests PRIVATE ps2_runtime)
+    target_include_directories(boot_vif_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
+    add_test(NAME boot_vif COMMAND boot_vif_tests)
     add_executable(boot_overlay_tests tests/test_boot_overlays.cpp
         tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
     target_link_libraries(boot_overlay_tests PRIVATE yakuza_boot_overlay_dispatch ps2_runtime)

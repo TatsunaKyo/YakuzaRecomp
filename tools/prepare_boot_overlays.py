@@ -86,7 +86,7 @@ def prepare(folders, output):
         cmake += f'target_link_libraries({target} PRIVATE ps2_runtime)\n'
         cmake += f'target_compile_features({target} PRIVATE cxx_std_20)\n'
         cmake += f'target_include_directories({target} PRIVATE {cmake_path(files[0].parent)})\n'
-        cmake += f'target_precompile_headers({target} PRIVATE "${{ps2recomp_SOURCE_DIR}}/ps2xRuntime/include/ps2_runtime_macros.h")\n'
+        cmake += f'target_precompile_headers({target} PRIVATE "${{runtime_private}}/include/ps2_runtime_macros.h")\n'
         cmake += f'set_target_properties({target} PROPERTIES UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE 16)\n'
         cmake += f'if(WIN32)\n target_compile_definitions({target} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)\nendif()\n'
         for path in files:
