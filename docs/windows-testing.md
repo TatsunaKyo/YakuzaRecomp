@@ -6,7 +6,7 @@ Current evidence:
 
 | Check | Result |
 | --- | --- |
-| Native Linux build and 47 Python tests | Passed |
+| Native Linux build and 48 Python tests | Passed |
 | Overlay loader swapping, bounds and BSS tests on Linux | Passed |
 | Original 11 overlays loaded into RAM; three translated routines on Linux | 768 cases passed; hardware/constructors/gameplay untested |
 | Four upstream IOP test programs on Linux | Passed |
@@ -15,9 +15,9 @@ Current evidence:
 | LLVM-MinGW cross-build of overlay tests and translated routine probe | Passed; execution pending |
 | Windows PE inspection | x86-64 console executable; only Windows system/UCRT DLL imports |
 | Original game execution on actual Windows | Pending |
-| GitHub Actions Windows/MSVC and Linux default build and tests | Passed for 90e89b4; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39774270977) |
-| Full-runtime Windows/MSVC host build and six host checks | Passed with synthetic code: recursive dispatch, priority results, resume-then-wake results, VIF uploads, overlay activation and invalid-input handling; same CI run |
-| IPU input regression on Linux and Windows cross-build | Passed on Linux; Windows x64 test executable cross-builds. Complete IPU picture decoding remains unimplemented |
+| GitHub Actions Windows/MSVC and Linux default build and tests | Passed for a27c8a3; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39838465814) |
+| Full-runtime Windows/MSVC host build and seven host checks | Passed with synthetic code, including IPU block/IDCT and DMA checks; same CI run |
+| IPU MPEG blocks and RGB32 conversion on Linux and Windows cross-build | Golden pixel and DMA checks pass on Linux; Windows x64 host/test executables cross-build. Original movie playback remains unverified |
 | Full-runtime resident/MAIN and complete GAME boot-probe cross-link | Passed on Linux and Windows x64 |
 | Original PAL loader to verified MAIN entry on Linux | Passed; continued execution loads GAME and reaches the opening-movie read |
 | Original MAIN disc read, DMA and IOP module-start path on Linux | All nine IRX.DAT drivers started |
@@ -36,7 +36,7 @@ Unzip the diagnostic package, open PowerShell in that folder, and run:
 
 The minimal Linux diagnostic baseline ends with nine loaded modules, 15 threads and eight RPC servers. Start results 0 and 2 both represent resident modules. A driver initialization message about SIF not being initialized is present in this minimal host. Separately, continued original-game execution in the full Linux host loads all nine modules through the original EE-to-IOP DMA and module-start path; this does not verify every SIF service.
 
-The private Windows full-game host currently cross-builds with FFmpeg disabled, so MPEG decoding is unavailable in that build. The Linux host enables FFmpeg. Original movie playback remains unverified on either platform, and Windows execution with the original game data remains pending.
+The private Windows full-game host cross-builds with FFmpeg disabled; the Linux host enables it for the runtime's other media paths. Native IPU MPEG block decoding and RGB32 conversion use the same implementation on both targets and do not require FFmpeg. Original movie playback remains unverified on either platform, and Windows execution with the original game data remains pending.
 
 If testing is requested on Windows, the useful result is probe.txt plus the program's exit code and Windows version. There is no need for the player to install Linux or WSL.
 

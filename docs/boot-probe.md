@@ -122,7 +122,9 @@ The input path also decodes macroblock addresses, picture-dependent macroblock t
 
 Original movie execution now passes BDEC output transfers and reaches its motion-compensation callbacks. [SeedMpegMotionEntry.java](../tools/ghidra/SeedMpegMotionEntry.java) verifies all 148 bytes of the observed callback before recovering code previously marked as data. [SeedMpegMotionTable.java](../tools/ghidra/SeedMpegMotionTable.java) verifies all 16 original pointers before identifying the remaining entries. Existing callable addresses and instruction bytes remain preserved.
 
-IDEC, CSC and PACK commands remain unsupported and stop explicitly. Complete movie reconstruction and on-screen presentation remain unverified; macroblock output alone does not establish correct playback.
+RGB32 CSC consumes the declared number of Y/Cb/Cr macroblocks and emits RGBA using the documented integer conversion and threshold rules. Tests check black/white and colored quadrants, chroma subsampling, alpha boundaries, multiple blocks, output backpressure and exact DMA counts. Original execution completes full-frame conversions and stops at the next genuinely missing movie range. This native path is shared by Linux and Windows and does not require FFmpeg.
+
+IDEC, RGB16 CSC and PACK commands remain unsupported and stop explicitly. Correct movie reconstruction and on-screen presentation remain unverified; completed DMA transfers alone do not establish correct playback.
 
 ## Host controller adapter
 

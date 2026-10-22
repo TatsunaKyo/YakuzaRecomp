@@ -108,6 +108,36 @@ void IpuBitstream::pumpOutput(Registers& io, const OutputWriter& output) {
     }
     if (!io[from+0x20]) { io[from] &= ~0x100u; output_complete_ = true; }
 }
+bool IpuBitstream::emitBlock(Registers& io, const OutputWriter& output) {
+    while (output_cursor_ < output_size_) {
+        pumpOutput(io, output);
+        if (output_fifo_.size() == 8) return false;
+        Quad quad;
+        std::copy_n(block_output_.begin()+output_cursor_, 16, quad.begin());
+        output_fifo_.push_back(quad); output_cursor_ += 16;
+    }
+    pumpOutput(io, output); return true;
+}
+void IpuBitstream::convertColor() {
+    // Scalar integer method adapted from PCSX2's yuv2rgb_reference at the
+    // credited pinned revision (PCSX2 Dev Team, GPL-3.0-or-later). Separate
+    // signed shifts preserve the documented IPU rounding, unlike float BT.601.
+    for (unsigned y=0; y<16; ++y) for (unsigned x=0; x<16; ++x) {
+        const unsigned pixel=y*16+x, chroma=(y/2)*8+x/2;
+        const int cb=int(color_input_[256+chroma])-128, cr=int(color_input_[320+chroma])-128;
+        const int lum=(149*std::max(0, int(color_input_[pixel])-16)) >> 6;
+        auto* rgba=block_output_.data()+pixel*4;
+        rgba[0]=uint8_t(std::clamp((lum+((204*cr)>>6)+1)>>1, 0, 255));
+        rgba[1]=uint8_t(std::clamp((lum+((-104*cr)>>6)+((-50*cb)>>6)+1)>>1, 0, 255));
+        rgba[2]=uint8_t(std::clamp((lum+((258*cb)>>6)+1)>>1, 0, 255));
+        rgba[3]=0x80;
+        if (rgba[0]<thresholds_[0] && rgba[1]<thresholds_[0] && rgba[2]<thresholds_[0])
+            std::fill_n(rgba, 4, uint8_t(0));
+        else if (rgba[0]<thresholds_[1] && rgba[1]<thresholds_[1] && rgba[2]<thresholds_[1])
+            rgba[3]=0x40;
+    }
+    output_size_=1024; output_cursor_=0;
+}
 void IpuBitstream::service(Registers& io, std::span<const uint8_t> ram, const OutputWriter& output) {
     registers_ = &io;
     pump(io, ram);
@@ -117,7 +147,18 @@ void IpuBitstream::service(Registers& io, std::span<const uint8_t> ram, const Ou
         if (!ensure(skip_, io, ram)) return;
         advance(skip_); skip_ = 0;
     }
-    if (kind_ == 2) {
+    if (kind_ == 7) {
+        while (color_remaining_) {
+            while (copied_ < color_input_.size()) {
+                if (!ensure(8, io, ram)) return;
+                color_input_[copied_++]=uint8_t(peek(8)); advance(8);
+            }
+            if (copied_ == color_input_.size()) { convertColor(); ++copied_; }
+            if (!emitBlock(io, output)) return;
+            --color_remaining_; copied_=0;
+        }
+        busy_=false;
+    } else if (kind_ == 2) {
         if (!copied_) {
             if (!decoder_.step(*this, io, ram)) return;
             if (decoder_.error()) { error_ = true; busy_ = false; return; }
@@ -126,17 +167,11 @@ void IpuBitstream::service(Registers& io, std::span<const uint8_t> ram, const Ou
                 block_output_[2*i] = uint8_t(pixels[i]);
                 block_output_[2*i+1] = uint8_t(uint16_t(pixels[i]) >> 8);
             }
-            pattern_ = decoder_.pattern(); output_cursor_ = 0; copied_ = 1;
+            pattern_ = decoder_.pattern(); output_cursor_ = 0; output_size_ = 768; copied_ = 1;
         }
         if (copied_ == 1) {
-            while (output_cursor_ < block_output_.size()) {
-                pumpOutput(io, output);
-                if (output_fifo_.size() == 8) return;
-                Quad quad;
-                std::copy_n(block_output_.begin()+output_cursor_, 16, quad.begin());
-                output_fifo_.push_back(quad); output_cursor_ += 16;
-            }
-            pumpOutput(io, output); copied_ = 2;
+            if (!emitBlock(io, output)) return;
+            copied_ = 2;
         }
         if (copied_ == 2) {
             if (!ensure(8, io, ram)) return;
@@ -258,6 +293,9 @@ void IpuBitstream::write(uint32_t address, uint32_t value, Registers& io, std::s
             clearInput(); position_ = value & 127; busy_ = false; skip_ = copied_ = 0;
         } else if (kind_ == 2) {
             decoder_.start(value, control_); skip_ = value & 63; copied_ = 0; busy_ = true;
+        } else if (kind_ == 7) {
+            if (value & (1u << 27)) throw IpuError("RGB16 IPU CSC is not implemented");
+            color_remaining_=value & 0x7ff; skip_=copied_=0; busy_=true;
         } else if (kind_ == 9) {
             thresholds_ = {uint16_t(value & 511), uint16_t((value >> 16) & 511)};
             busy_ = false;

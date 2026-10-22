@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 void check(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
 constexpr uint32_t cmd = 0x10002000, ctrl = 0x10002010, bp = 0x10002020;
@@ -120,6 +121,63 @@ void blockTests(PS2Memory& memory) {
     try { memory.write32(cmd, 0x2c010000); }
     catch (const std::runtime_error&) { rejected=true; }
     check(rejected, "FROM_IPU DMA wrote beyond EE RAM");
+}
+void colorTests(PS2Memory& memory) {
+    const auto run = [&](const std::vector<uint8_t>& input, const std::vector<uint8_t>& expected,
+                         uint32_t thresholds=0, bool delayed=false) {
+        memory.write32(ctrl, 1u << 30);
+        memory.write32(cmd, 0x90000000 | thresholds);
+        memory.write32(0x1000b000,0); memory.write32(0x1000b400,0);
+        memory.write32(0x1000e000,1); memory.write32(0x1000e010,0x18);
+        for (unsigned i=0; i<input.size(); ++i) memory.write8(0x40000+i,input[i]);
+        const auto output = [&] {
+            memory.write32(0x1000b010,0x30000);
+            memory.write32(0x1000b020,uint32_t(expected.size()/16));
+            memory.write32(0x1000b000,0x100);
+        };
+        if (!delayed) output();
+        memory.write32(0x1000b410,0x40000);
+        memory.write32(0x1000b420,uint32_t(input.size()/16));
+        memory.write32(0x1000b400,0x101);
+        memory.write32(cmd,0x70000000 | uint32_t(input.size()/384));
+        if (delayed) {
+            check(memory.read32(ctrl)&0x80000000u,"CSC ignored output FIFO backpressure");
+            check(((memory.read32(ctrl)>>4)&15)==8,"CSC output FIFO did not fill");
+            output();
+        }
+        check(!(memory.read32(ctrl)&0x80000000u),"CSC did not finish after all macroblocks");
+        for (unsigned i=0; i<expected.size(); ++i)
+            check(memory.read8(0x30000+i)==expected[i],"CSC golden RGBA byte differs");
+        check(memory.read32(0x1000b010)==0x30000+expected.size(),"CSC output address differs");
+        check(memory.read32(0x1000b410)==0x40000+input.size(),"CSC input address differs");
+        check(memory.read32(0x1000b020)==0 && memory.read32(0x1000b420)==0,"CSC DMA count differs");
+        check(!(memory.read32(0x1000b000)&0x100) && !(memory.read32(0x1000b400)&0x100),"CSC DMA retained STR");
+        check((memory.read32(0x1000e010)&0x18)==0x18,"CSC did not complete both DMA channels");
+        const std::array<uint8_t,16> following{0,0,1,0xb3};feed(memory,following.data());
+        check(bits(memory,0)==0x1b3,"CSC consumed the next stream's input");
+    };
+    std::vector<uint8_t> input(768,128),expected(2048,0x80);
+    for (unsigned i=0;i<256;++i) { input[i]=16;input[384+i]=235; }
+    for (unsigned i=0;i<512;++i) for (unsigned channel=0;channel<3;++channel)
+        expected[4*i+channel]=i<256 ? 0 : 255;
+    run(input,expected,0,true);
+    input.assign(384,128);expected.assign(1024,0x80);
+    const std::array<uint8_t,4> luma{81,145,41,128},cb{90,54,240,128},cr{240,34,110,128};
+    const std::array<std::array<uint8_t,3>,4> rgb{{{254,0,0},{0,255,1},{0,0,255},{130,130,130}}};
+    for(unsigned y=0;y<16;++y) for(unsigned x=0;x<16;++x) {
+        const unsigned quadrant=(y/8)*2+x/8, pixel=y*16+x;
+        input[pixel]=luma[quadrant];
+        input[256+(y/2)*8+x/2]=cb[quadrant];input[320+(y/2)*8+x/2]=cr[quadrant];
+        for(unsigned c=0;c<3;++c) expected[4*pixel+c]=rgb[quadrant][c];
+    }
+    run(input,expected);
+    input.assign(384,128);expected.assign(1024,130);
+    for(unsigned i=0;i<256;++i) expected[4*i+3]=0x40;
+    run(input,expected,131u<<16); // Strict threshold produces half alpha.
+    for(unsigned i=0;i<256;++i) expected[4*i+3]=0x80;
+    run(input,expected,130u<<16); // Equality keeps full alpha.
+    expected.assign(1024,0);
+    run(input,expected,131); // Threshold zeroing includes alpha.
 }
 int main() {
     PS2Memory memory;
@@ -270,5 +328,6 @@ int main() {
     // An ordinary guest address error keeps the existing guest-fault behavior.
     check(runtime.Load32(ram, &context, 0x10001) == 0, "Guest address faults changed behavior");
     blockTests(memory);
-    std::cout << "IPU bits, VLC, block/IDCT golden pixels, input/output DMA, waits and explicit limits pass\n";
+    colorTests(memory);
+    std::cout << "IPU bits, VLC, block/IDCT and CSC golden pixels, DMA, waits and explicit limits pass\n";
 }

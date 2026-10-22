@@ -15,8 +15,8 @@ class IpuError : public std::runtime_error {
 public:
     using std::runtime_error::runtime_error;
 };
-// EE IPU transport, MPEG symbols and BDEC macroblocks. IDEC, CSC and PACK
-// remain explicitly unsupported.
+// EE IPU transport, MPEG symbols, BDEC macroblocks and RGB32 CSC.
+// IDEC, RGB16 CSC and PACK remain explicitly unsupported.
 class IpuBitstream {
 public:
     using Registers = std::unordered_map<uint32_t, uint32_t>;
@@ -41,8 +41,9 @@ private:
     std::deque<Quad> fifo_, internal_;
     std::deque<Quad> output_fifo_;
     IpuBlockDecoder decoder_;
-    std::array<uint8_t, 768> block_output_{};
-    unsigned output_cursor_ = 0, pattern_ = 0;
+    std::array<uint8_t, 1024> block_output_{};
+    std::array<uint8_t, 384> color_input_{};
+    unsigned output_cursor_ = 0, output_size_ = 0, color_remaining_ = 0, pattern_ = 0;
     bool output_complete_ = false, start_code_ = false;
     std::array<uint8_t, 128> quant_{};
     std::array<uint8_t, 32> vq_{};
@@ -62,6 +63,8 @@ private:
     uint32_t peek(unsigned bits) const;
     void service(Registers& io, std::span<const uint8_t> ram, const OutputWriter& output);
     void pumpOutput(Registers& io, const OutputWriter& output);
+    bool emitBlock(Registers& io, const OutputWriter& output);
+    void convertColor();
     uint32_t controlValue() const;
 };
 IpuBitstream& ipuFor(const void* memory);
