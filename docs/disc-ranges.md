@@ -40,6 +40,10 @@ The opening-movie worker then requests the first 1 MiB of `/MEDIA2/MOVIE/SEGALOG
 
 After translating the next observed movie callback, execution requests the following 200704 bytes (196 KiB) at `OGRE2.CVM:0x97764800:0x31000`. Bundle 11 supplies this range. Both reads complete, and all supplied bytes match their copies in emulated EE RAM. Execution then reaches another indirect callback in the original stream-processing code.
 
+Bundle 12 supplies the remaining 29,034,496 bytes of the indexed opening movie. The complete `SEGALOGO.SFD` is now available privately. Selected reconstructed frames match an independent decode within a one-level sample difference; complete playback remains unverified.
+
+Bundle 13 supplies `MSSN1020.DAT` at `OGRE.CVM:0x31f2000:0x800`. The full sector matches its copy in EE RAM. Execution advances to `/MEDIA2/AUTHOR/OPENING/OPENING_MOVIE.DAT` at `OGRE2.CVM:0x27fed800:0x800`. The next collection includes this sector and the adjacent indexed companion `OPENING_MOVIE.B00` as one 4 KiB range, `OGRE2.CVM:0x27fed000:0x1000`. The descriptor read is observed; the companion is included to reduce separate small uploads.
+
 ## Import and run internally
 
 ```sh

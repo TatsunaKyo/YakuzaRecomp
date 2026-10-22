@@ -164,6 +164,8 @@ After the scratchpad transfer correction and native-device optimization, executi
 
 The next Linux run passes both observed callback stops and, with actual host Start input during the movie, reaches `OGRE.CVM:0x31f2000:0x800`. The original PAL index identifies this sector as the complete 800-byte `/MEDIA/MISSION/MSSN10XX/MSSN1020.DAT`, including sector padding. These original bytes are not yet supplied. This verifies progress through the exercised movie-exit path; automatic complete playback and the title screen remain unverified.
 
+Bundle 13 now supplies that sector. The subsequent run completes the read, with all 2,048 bytes matching EE RAM at `0x006f5240`, and reaches the missing 240-byte `/MEDIA2/AUTHOR/OPENING/OPENING_MOVIE.DAT` descriptor. Its original sector starts at `OGRE2.CVM:0x27fed800`; no missing indirect call is observed in this run. The next collection covers it and the adjacent opening-scene companion file.
+
 ## PAL native memory layout
 
 The default runtime reserves the top 1 MiB of EE RAM for helpers. MAIN's original allocator then fails a 0x3c3500-byte graphics allocation. Its subsequent cleanup reads an invalid slot and loops. Returning the original PAL heap boundary, 0x1fe0000 below the 128 KiB main stack, makes that allocation succeed and reaches the original PAL display-mode setup call.
