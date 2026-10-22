@@ -38,6 +38,7 @@ There is no release date yet. Completing translation is one part of the work; ru
 
 - Resident and MAIN overlay code analyzed with the PS2 R5900 Ghidra extension.
 - Five original method-table catalogs verified by SHA-256: 260 tables containing 748 distinct methods. Analysis identifies previously missing callback entries while preserving original instruction bytes. This does not establish execution coverage for every method.
+- Movie driver analysis verifies three original driver variants and all 98 method slots in their seven interfaces. Supplemental translation registers every verified method pointer and retains prior callable entries; altered descriptor and method data are rejected before analysis changes.
 - A static generation probe reports zero unhandled-instruction errors, with unresolved control-flow warnings still remaining.
 - The resident/MAIN translation compiles and links with the full desktop runtime for Linux x86-64 and Windows x64. A newly discovered resident constructor is translated separately, with the original instruction bytes verified.
 - All nine original driver modules from the supplied PAL IRX.DAT initialized in the minimal IOP probe, creating eight RPC servers. This does not verify audio, controller or memory-card behavior.
