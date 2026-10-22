@@ -8,6 +8,7 @@
 #include "yakuza/boot_overlays.h"
 #include "pal_runtime_layout.h"
 #include <atomic>
+#include <array>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -24,6 +25,59 @@ namespace {
 std::atomic<bool> reached_main{false}, finished{false};
 bool continue_main = false;
 PS2Runtime::RecompiledFunction original_main = nullptr;
+bool environment_flag(const char* name) {
+#ifdef _WIN32
+    char value[2]{};
+    return GetEnvironmentVariableA(name, value, sizeof(value)) == 1 && value[0] == '1';
+#else
+    const char* value = std::getenv(name);
+    return value && std::string_view(value) == "1";
+#endif
+}
+struct ObservedCall {
+    uint32_t address;
+    const char* name;
+    PS2Runtime::RecompiledFunction original = nullptr;
+    unsigned calls = 0, pending_calls = 0, worker_calls = 0;
+};
+std::array<ObservedCall, 10> movie_calls{{
+    {0x1cfbb0, "movie foreground server"}, {0x1cfbf8, "movie background server"},
+    {0x1cfe60, "movie server gate"}, {0x1cf728, "movie request"},
+    {0x1cf568, "movie try lock"}, {0x1cfc40, "movie mode"},
+    {0x1050d0, "wake thread"}, {0x105130, "resume thread"},
+    {0x1ca368, "open movie"}, {0x1ff7f8, "movie worker notification"},
+}};
+template<size_t Index> void observe_movie_call(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
+    auto& call = movie_calls[Index];
+    const auto argument = GPR_U32(ctx, 4), caller = GPR_U32(ctx, 31);
+    const bool pending = Ps2FastRead32(memory, 0x44c5f0) == 1;
+    const bool record = ++call.calls <= 4 || (pending && ++call.pending_calls <= 8) ||
+        ((Index == 6 || Index == 7) && argument == 8 && ++call.worker_calls <= 16);
+    if (record) std::cout << "[yakuza-movie:call] " << call.name << " entry=0x" << std::hex
+        << call.address << " caller=0x" << caller << " a0=0x" << argument
+        << " mode=" << Ps2FastRead32(memory, 0x44c3e8)
+        << " lock=" << Ps2FastRead32(memory, 0x44c430) << " pending=" << pending
+        << " thread=" << runtime->eeScheduler().currentThreadId() << std::dec << '\n';
+    // Invoke the real entry once. Incomplete calls retain their original PC
+    // and scheduler continuation; tracing never completes or skips a call.
+    call.original(memory, ctx, runtime);
+    if (record) std::cout << "[yakuza-movie:return] entry=0x" << std::hex << call.address
+        << " pc=0x" << ctx->pc << " v0=0x" << GPR_U32(ctx, 2)
+        << " returned=" << (ctx->pc == caller) << std::dec << '\n';
+}
+void install_movie_trace(PS2Runtime& runtime) {
+    const PS2Runtime::RecompiledFunction observers[] = {
+        observe_movie_call<0>, observe_movie_call<1>, observe_movie_call<2>, observe_movie_call<3>,
+        observe_movie_call<4>, observe_movie_call<5>, observe_movie_call<6>, observe_movie_call<7>,
+        observe_movie_call<8>, observe_movie_call<9>,
+    };
+    for (size_t i = 0; i < movie_calls.size(); ++i) {
+        auto& call = movie_calls[i];
+        call.original = runtime.lookupFunction(call.address);
+        if (!call.original || !runtime.replaceFunction(call.address, observers[i]))
+            throw std::runtime_error("Movie trace does not match the verified PAL map");
+    }
+}
 void dump_graphics(PS2Runtime& runtime, const std::filesystem::path& folder) {
     std::filesystem::create_directories(folder);
     std::ofstream trace(folder / "gs-trace.txt");
@@ -99,14 +153,8 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
     runtime.setMissingFunctionPolicy(PS2Runtime::MissingFunctionPolicy::Stop);
     if (!runtime.initialize("YakuzaRecomp | PAL boot development probe")) return 2;
     if (!runtime.loadELF((folder / "SLES_541.71").string())) return 2;
-#ifdef _WIN32
-    char graphics_env[2]{};
-    const bool graphics_trace = continue_main &&
-        GetEnvironmentVariableA("YAKUZA_BOOT_DUMP_GS", graphics_env, sizeof(graphics_env)) == 1 && graphics_env[0] == '1';
-#else
-    const char* graphics_env = std::getenv("YAKUZA_BOOT_DUMP_GS");
-    const bool graphics_trace = continue_main && graphics_env && std::string_view(graphics_env) == "1";
-#endif
+    const bool graphics_trace = continue_main && environment_flag("YAKUZA_BOOT_DUMP_GS");
+    const bool movie_trace = continue_main && environment_flag("YAKUZA_BOOT_TRACE_MOVIE");
     if (graphics_trace) runtime.gs().setDebugHistoryPaused(false);
     auto paths = PS2Runtime::getIoPaths();
     paths.mcRoot = std::filesystem::absolute(state / "mc0");
@@ -115,6 +163,7 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
     yakuza::install_pal_sdk_hooks(runtime);
     yakuza::install_boot_supplement(runtime);
     yakuza::install_boot_overlay_hooks(runtime, yakuza::compiled_boot_overlays());
+    if (movie_trace) install_movie_trace(runtime);
     original_main = runtime.lookupFunction(0x22cc40);
     if (!original_main) throw std::runtime_error("Missing original MAIN entry in the generated dispatch map");
     if (!runtime.replaceFunction(0x22cc40, main_entry)) throw std::runtime_error("MAIN entry is outside dispatch table");
@@ -152,6 +201,8 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
             std::cout << "[yakuza-ee-thread] id=" << thread.id << " priority=" << thread.currentPriority
                       << " status=" << static_cast<unsigned>(thread.status)
                       << " wait=" << static_cast<unsigned>(thread.waitReason) << " wait_id=" << thread.waitId
+                      << " suspends=" << thread.suspendCount << " wakes=" << thread.wakeupCount
+                      << " callbacks=" << thread.invocationDepth
                       << " pc=0x" << std::hex << thread.pc << " entry=0x" << thread.entry
                       << " ra=0x" << thread.ra << std::dec << '\n';
         for (const auto& semaphore : ee.semaphores)
@@ -162,6 +213,8 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
             std::cout << "[yakuza-register] r" << reg << "=0x" << std::hex
                       << GPR_U64((&runtime.cpu()), reg) << std::dec << '\n';
         if (graphics_trace) dump_graphics(runtime, state / "graphics");
+        if (movie_trace) for (const auto& call : movie_calls)
+            std::cout << "[yakuza-movie:total] " << call.name << " calls=" << call.calls << '\n';
     }
     // Continued exploration has no success end condition yet. Keep failures or
     // time limits distinct from the deliberate successful MAIN checkpoint.

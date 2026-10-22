@@ -32,6 +32,7 @@ SOURCE_FILES = [
     "tests/test_prepare_boot.py", "tests/check_boot_cli.py", "tests/test_boot_dispatch.cpp", "tests/test_boot_priority.cpp",
     "tests/test_prepare_boot_overlays.py", "tests/test_boot_overlays.cpp",
     "tests/test_boot_vif.cpp",
+    "tests/test_boot_resume.cpp",
     "tests/fixtures/boot-host/register_functions.cpp", "tests/fixtures/boot-host/synthetic_entry.cpp",
     "tests/fixtures/boot-host/ps2_recompiled_functions.h", "tests/fixtures/boot-host/ps2_recompiled_stubs.h",
 ]

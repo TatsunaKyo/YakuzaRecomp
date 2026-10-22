@@ -121,6 +121,11 @@ if(BUILD_TESTING)
     target_link_libraries(boot_priority_tests PRIVATE ps2_runtime)
     target_include_directories(boot_priority_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
     add_test(NAME boot_priority COMMAND boot_priority_tests)
+    add_executable(boot_resume_tests tests/test_boot_resume.cpp
+        tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
+    target_link_libraries(boot_resume_tests PRIVATE ps2_runtime)
+    target_include_directories(boot_resume_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
+    add_test(NAME boot_resume COMMAND boot_resume_tests)
     add_executable(boot_vif_tests tests/test_boot_vif.cpp
         tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
     target_link_libraries(boot_vif_tests PRIVATE ps2_runtime)

@@ -91,6 +91,14 @@ def main():
             // critical sections save that value and restore it on exit.
             setReturnS32(ctx, result == 0 ? oldPriority : result);
 """)
+    thread = replace(thread, """        const int result = ee.resumeThread(static_cast<int>(getRegU32(ctx, 4)), false);
+        setReturnS32(ctx, result);
+""", """        const int id = static_cast<int>(getRegU32(ctx, 4));
+        const int result = ee.resumeThread(id, false);
+        // EE ResumeThread returns the target ID on success. The original
+        // CRI frame loop checks that ID before waking its resumed worker.
+        setReturnS32(ctx, result == 0 ? id : result);
+""")
     texts["Kernel/Syscalls/Thread.cpp"] = thread
     include = args.runtime_dir.resolve() / "include"
     memory_header = (include / "runtime/ps2_memory.h").read_bytes().replace(b"\r\n", b"\n")
