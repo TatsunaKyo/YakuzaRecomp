@@ -136,7 +136,15 @@ After a native wakeup acknowledgement correction, the clean Linux run renders th
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x76000:0xe000 --output .\yakuza-boot-data-31.zip
 ```
 
-Bundle 31 supplies all 16 caption files, and all 34 previous excerpt records remain unchanged. Only `CAPTION01.DAT` was the observed request; the other caption files are companions included to reduce separate small uploads. Native caption processing is being checked. Picture colors, the corrupted bottom strip and an intermittent repeated-frame stall remain unresolved; the earlier movie transition does not establish correct complete playback, sound or gameplay.
+Bundle 31 supplies all 16 caption files, and all 34 previous excerpt records remain unchanged. Only `CAPTION01.DAT` was the observed request; the other caption files are companions included to reduce separate small uploads. A clean native run, without the optional chapter-title Cross press or movie skip input, passes that boundary and requests `/MEDIA2/MOVIE/CAPTION01.SFD`. The complete descriptor sector is not retained identically in final RAM, so no whole-range byte equality is claimed. Picture colors, the corrupted bottom strip and an intermittent repeated-frame stall remain unresolved; the movie transition does not establish correct complete playback, sound or gameplay.
+
+`CAPTION01.SFD` is a separate 1,021,952-byte movie, requested as `OGRE2.CVM:0x8f032000:0xf9800`. The next collection covers all seven adjacent `CAPTION01.SFD` through `CAPTION07.SFD` files in one 7,213,056-byte range (about 6.9 MiB), ending at `0x8f713000`:
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x8f032000:0x6e1000 --output .\yakuza-boot-data-32.zip
+```
+
+Only the first caption movie is an observed request. The other six are included as related companions. These movie bytes are not supplied yet; they differ from the complete caption metadata in bundle 31 and the three already supplied movies.
 
 ## Import and run internally
 
