@@ -110,7 +110,16 @@ With bundle 25 supplied, the native run passes `CHAPTER1.DAT` and displays the o
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x314d000:0x6fa800 --output .\yakuza-boot-data-26.zip
 ```
 
-Upload that ZIP privately. This includes the observed request and 47 already supplied mission files, whose overlapping bytes must match. Other mission files are collected in advance to reduce later uploads and have not all been observed executing. The range uses a new start, avoiding a conflicting existing excerpt filename.
+Bundle 26 supplies the complete mission tree. Its four overlaps with earlier excerpt records match, and all previous records remain unchanged. The collection includes the observed request and 47 already supplied mission files. Other mission files are collected in advance to reduce later uploads and have not all been observed executing. The range uses a new start, avoiding a conflicting existing excerpt filename.
+
+The native run now passes `MSSN4154.DAT`, with its entire 8,192-byte sector range matching EE RAM. The next missing file is `/MEDIA2/AUTHOR/CHAPTER01/AUTH_CHAPTER01_001.DAT`, a 64-byte scene descriptor read as a 2,048-byte sector at `OGRE2.CVM:0x9d000`. Its Chapter 1 directory contains 129 scene-data files spanning about 43.6 MiB, so collect it in two ZIPs:
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x9c800:0x1800000 --output .\yakuza-boot-data-27.zip
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x189c800:0x1395800 --output .\yakuza-boot-data-28.zip
+```
+
+Upload both ZIPs privately. Their uncompressed payloads are 24 MiB and about 19.6 MiB, each within the tool's limit. They are adjacent ranges that together cover the complete directory. `AUTH_CHAPTER01_008.DAT` spans the boundary; both excerpts provide its complete bytes. Other scene files are included in advance and have not all been requested by execution. No complete original archives are distributed publicly.
 
 ## Import and run internally
 
