@@ -119,7 +119,16 @@ python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x189c800:0x1395800 --output .\yakuza-boot-data-28.zip
 ```
 
-Upload both ZIPs privately. Their uncompressed payloads are 24 MiB and about 19.6 MiB, each within the tool's limit. They are adjacent ranges that together cover the complete directory. `AUTH_CHAPTER01_008.DAT` spans the boundary; both excerpts provide its complete bytes. Other scene files are included in advance and have not all been requested by execution. No complete original archives are distributed publicly.
+Bundles 27 and 28 supply both adjacent ranges, completing all 129 indexed files. Their uncompressed payloads are 24 MiB and about 19.6 MiB, each within the tool's limit. `AUTH_CHAPTER01_008.DAT` spans the boundary; the two excerpts compose its complete original bytes. All earlier records remain unchanged. Other scene files are included in advance and have not all been requested by execution. No complete original archives are distributed publicly.
+
+After importing both scene-data bundles, native execution passes the first descriptor read and requests the initial 1 MiB of `/MEDIA2/MOVIE/AUTH_CHAPTER01_001.SFD`. This separate movie is 39,821,312 bytes (about 38 MiB). Collect the full indexed file in two ZIPs:
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x4b8b3000:0x1800000 --output .\yakuza-boot-data-29.zip
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x4d0b3000:0xdfa000 --output .\yakuza-boot-data-30.zip
+```
+
+Upload both ZIPs privately. Their payloads are 24 MiB and about 14 MiB, and together cover the exact complete file through `0x4dead000`. This groups the full stream to avoid repeated movie-chunk requests. The earlier SEGA-logo and opening movies are already complete and are not part of this collection. Native Chapter 1 movie playback remains unverified.
 
 ## Import and run internally
 
