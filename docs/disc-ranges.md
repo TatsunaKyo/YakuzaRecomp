@@ -44,11 +44,19 @@ Bundle 12 supplies the remaining 29,034,496 bytes of the indexed opening movie. 
 
 Bundle 13 supplies `MSSN1020.DAT` at `OGRE.CVM:0x31f2000:0x800`. The full sector matches its copy in EE RAM. Execution advances to `/MEDIA2/AUTHOR/OPENING/OPENING_MOVIE.DAT` at `OGRE2.CVM:0x27fed800:0x800`. The next collection includes this sector and the adjacent indexed companion `OPENING_MOVIE.B00` as one 4 KiB range, `OGRE2.CVM:0x27fed000:0x1000`. The descriptor read is observed; the companion is included to reduce separate small uploads.
 
-Bundle 14 supplies both opening-scene files. The next run reads both sectors and reaches `/MEDIA2/MOVIE/OPENING_MOVIE.SFD`, a separate 59,004,928-byte cinematic. The first missing read is `OGRE2.CVM:0x93e1f000:0x100000`. The complete indexed file fits three collections: `OGRE2.CVM:0x93e1f000:0x1800000`, `OGRE2.CVM:0x9561f000:0x1800000` and `OGRE2.CVM:0x96e1f000:0x845800`. Each stays within the existing range, ZIP and upload limits. These requested bytes are not yet supplied; playback of this cinematic remains unverified.
+Bundle 14 supplies both opening-scene files. The next run reads both sectors and reaches `/MEDIA2/MOVIE/OPENING_MOVIE.SFD`, a separate 59,004,928-byte cinematic. The first missing read is `OGRE2.CVM:0x93e1f000:0x100000`. The complete indexed file fits three collections: `OGRE2.CVM:0x93e1f000:0x1800000`, `OGRE2.CVM:0x9561f000:0x1800000` and `OGRE2.CVM:0x96e1f000:0x845800`. Each stays within the existing range, ZIP and upload limits. These bytes were supplied in the following three bundles; playback validation continues separately.
 
-Bundles 15 through 17 now supply all three parts. Their combined length matches the complete indexed `OPENING_MOVIE.SFD`; both this cinematic and the earlier `SEGALOGO.SFD` are available privately. After import, execution reaches an opening-scene interface callback before the cinematic read completes. Further translation is in progress; supplying the data does not establish successful playback.
+Bundles 15 through 17 supply all three parts. Their combined length matches the complete indexed `OPENING_MOVIE.SFD`; both this cinematic and the earlier `SEGALOGO.SFD` are available privately. The first run after import reached an opening-scene interface callback before the cinematic read completed. The additional translation described below gets past that callback; supplying the data alone does not establish successful playback.
 
-After further interface translations, the Linux host reads the new movie and renders moving footage. Actual Start input exercises its exit and reaches `MSSN1040.DAT` at `OGRE.CVM:0x31f2800:0x800`. The next collection covers the remaining 44 small files in `/MEDIA/MISSION/MSSN10XX/`: one contiguous 90,112-byte range, `OGRE.CVM:0x31f2800:0x16000`, starting at the observed missing sector. It uses a new excerpt filename and preserves earlier imported mission records. Other files in the group are included to reduce repeated small uploads and have not all been requested by execution yet.
+After further interface translations, the Linux host reads the new movie and renders moving footage. Actual Start input exercises its exit and reaches `MSSN1040.DAT` at `OGRE.CVM:0x31f2800:0x800`. Bundle 18 supplies the remaining 44 small files in `/MEDIA/MISSION/MSSN10XX/`: one contiguous 90,112-byte range, `OGRE.CVM:0x31f2800:0x16000`, starting at that sector. It uses a new excerpt filename and preserves earlier imported mission records. Other files in the group are included to reduce repeated small uploads and have not all been requested by execution yet.
+
+The next Linux run reads `MSSN1040.DAT`; its full 2,048-byte sector matches EE RAM. It then requests `/MEDIA/ADVERTISE/TITLELOGO.DAT`, a 389,376-byte asset at `OGRE.CVM:0x922000`. The observed read includes sector padding: `OGRE.CVM:0x922000:0x5f800` (391,168 bytes). Collect it with the existing script:
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x922000:0x5f800 --output .\yakuza-boot-data-19.zip
+```
+
+Upload that ZIP privately. The title-logo read is the current data blocker; the title screen has not rendered yet.
 
 ## Import and run internally
 

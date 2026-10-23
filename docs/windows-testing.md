@@ -15,7 +15,7 @@ Current evidence:
 | LLVM-MinGW cross-build of overlay tests and translated routine probe | Passed; execution pending |
 | Windows PE inspection | x86-64 console executable; only Windows system/UCRT DLL imports |
 | Original game execution on actual Windows | Pending |
-| GitHub Actions Windows/MSVC and Linux default build and tests | Passed for 558f98a; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39874324639) |
+| GitHub Actions Windows/MSVC and Linux default build and tests | Passed for 88a7bcb; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39888738521) |
 | Full-runtime Windows/MSVC host build and eight host checks | Passed with synthetic code, including IPU block/IDCT, color conversion and scratchpad DMA checks; same CI run |
 | IPU MPEG blocks and RGB32 conversion on Linux and Windows cross-build | Golden pixel and DMA checks pass on Linux; Windows x64 host/test executables cross-build. Original movie playback remains unverified |
 | Scratchpad source-chain DMA and native error regression | Failed before the correction; passes on Linux and Windows/MSVC CI. The original-code Windows host cross-builds; actual game execution remains pending |
@@ -25,6 +25,7 @@ Current evidence:
 | Original memory-card dialog on Linux | Readable; complete 32 KiB glyph texture and 64-byte palette match original EE upload sources |
 | Verified movie-driver interfaces in the original-code host | Linux and Windows x64 cross-link with all 98 method slots registered. Linux passes the observed callbacks and reaches the next mission-data read after host Start input; Windows game execution remains pending |
 | Opening cinematic and broader interface translation | Both original-code hosts build with every method from 468 long tables registered. Linux renders moving opening footage and reaches `MSSN1040.DAT` after actual Start input. Color fidelity and complete playback remain unverified |
+| Mission data after the cinematic exit | The Linux v54 host reads `MSSN1040.DAT`, with its complete sector matching EE RAM, then requests missing `TITLELOGO.DAT`. The title screen has not rendered; original-game Windows execution remains pending |
 | Game boot, rendering, sound, input and gameplay | Pending |
 
 ## Running the Windows diagnostic
