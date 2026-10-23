@@ -21,6 +21,7 @@ SOURCE_FILES = [
     "tools/ghidra/SeedOverlayIndirect.java",
     "tools/ghidra/SeedCvmCallbacks.java",
     "tools/ghidra/SeedBootUpdateCallbacks.java",
+    "tools/ghidra/SeedLongInterfaceMethods.java",
     "include/yakuza/overlay_slot.h", "src/overlay_slot.cpp",
     "include/yakuza/boot_overlays.h", "src/boot_overlays.cpp", "tools/prepare_boot_overlays.py",
     "include/yakuza/native_pad.h", "src/native_pad.cpp", "tests/test_native_pad.cpp",

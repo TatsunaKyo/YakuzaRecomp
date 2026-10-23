@@ -48,6 +48,8 @@ Bundle 14 supplies both opening-scene files. The next run reads both sectors and
 
 Bundles 15 through 17 now supply all three parts. Their combined length matches the complete indexed `OPENING_MOVIE.SFD`; both this cinematic and the earlier `SEGALOGO.SFD` are available privately. After import, execution reaches an opening-scene interface callback before the cinematic read completes. Further translation is in progress; supplying the data does not establish successful playback.
 
+After further interface translations, the Linux host reads the new movie and renders moving footage. Actual Start input exercises its exit and reaches `MSSN1040.DAT` at `OGRE.CVM:0x31f2800:0x800`. The next collection covers the complete small `/MEDIA/MISSION/MSSN10XX/` group: 49 indexed files in one contiguous 100,352-byte range, `OGRE.CVM:0x31f0000:0x18800`. This includes the observed missing sector and earlier supplied mission sectors; overlap must agree. Other files in the group are included to reduce repeated small uploads and have not all been requested by execution yet.
+
 ## Import and run internally
 
 ```sh
