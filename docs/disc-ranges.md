@@ -70,7 +70,15 @@ The next observed missing read is `/MEDIA/STAGE/ST_RES/TALK_ST_RES.BIN` at `OGRE
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x1404c800:0x81800 --output .\yakuza-boot-data-21.zip
 ```
 
-Upload that ZIP privately. `TALK_ST_RES.BIN` is the observed request; the other nine files are related stage assets included in advance. They have not all been requested by execution yet. This group differs from the supplied `STGTALK/BRI/ST_RES.BIN`. Title-screen rendering remains unverified; the latest capture still shows the cinematic.
+Bundle 21 supplies this complete group. `TALK_ST_RES.BIN` was the observed request; the other nine files were related stage assets included in advance. The next run passes the earlier data stop and loads `ST_RES.DAT`, whose entire 114,688-byte sector range matches EE RAM. The ten group members have not all been observed individually. Execution then reaches a missing stage-resource method; supplemental translation now includes its verified original code. This group differs from the supplied `STGTALK/BRI/ST_RES.BIN`. Title-screen rendering remains unverified.
+
+After the stage-resource translation, execution passes the missing callback and requests `/MEDIA/CSE/BRI/CSE_TITLE.DAT` at `OGRE.CVM:0x1107000:0x13800`. Its 78,688 file bytes occupy a 79,872-byte sector read. The next collection covers the complete 27-file BRI CSE directory, including that observed request, as one 2,320,384-byte range (about 2.2 MiB):
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0xef0800:0x236800 --output .\yakuza-boot-data-22.zip
+```
+
+Upload that ZIP privately. It includes the previously supplied `CSE_STAY.DAT`; the importer verifies the overlap and keeps earlier records. The other files are grouped to reduce further uploads and have not all been requested by execution. The range starts at a new offset, avoiding an existing excerpt filename. Title rendering remains unverified.
 
 ## Import and run internally
 
