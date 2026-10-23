@@ -15,7 +15,7 @@ Current evidence:
 | LLVM-MinGW cross-build of overlay tests and translated routine probe | Passed; execution pending |
 | Windows PE inspection | x86-64 console executable; only Windows system/UCRT DLL imports |
 | Original game execution on actual Windows | Pending |
-| GitHub Actions Windows/MSVC and Linux default build and tests | Passed for 5093a24; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39870314451) |
+| GitHub Actions Windows/MSVC and Linux default build and tests | Passed for 558f98a; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39874324639) |
 | Full-runtime Windows/MSVC host build and eight host checks | Passed with synthetic code, including IPU block/IDCT, color conversion and scratchpad DMA checks; same CI run |
 | IPU MPEG blocks and RGB32 conversion on Linux and Windows cross-build | Golden pixel and DMA checks pass on Linux; Windows x64 host/test executables cross-build. Original movie playback remains unverified |
 | Scratchpad source-chain DMA and native error regression | Failed before the correction; passes on Linux and Windows/MSVC CI. The original-code Windows host cross-builds; actual game execution remains pending |

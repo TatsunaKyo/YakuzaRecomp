@@ -166,6 +166,8 @@ The next Linux run passes both observed callback stops and, with actual host Sta
 
 Bundle 13 now supplies that sector. The subsequent run completes the read, with all 2,048 bytes matching EE RAM at `0x006f5240`, and reaches the missing 240-byte `/MEDIA2/AUTHOR/OPENING/OPENING_MOVIE.DAT` descriptor. Its original sector starts at `OGRE2.CVM:0x27fed800`; no missing indirect call is observed in this run. The next collection covers it and the adjacent opening-scene companion file.
 
+Bundle 14 supplies the descriptor and its `OPENING_MOVIE.B00` companion. Original execution reads both and reaches the separate `/MEDIA2/MOVIE/OPENING_MOVIE.SFD` cinematic at `OGRE2.CVM:0x93e1f000`. Its indexed size is 59,004,928 bytes; the first 1 MiB request stops because those original bytes are absent. No new missing indirect call is observed on this path. The complete earlier `SEGALOGO.SFD` remains supplied and does not need collecting again.
+
 ## PAL native memory layout
 
 The default runtime reserves the top 1 MiB of EE RAM for helpers. MAIN's original allocator then fails a 0x3c3500-byte graphics allocation. Its subsequent cleanup reads an invalid slot and loops. Returning the original PAL heap boundary, 0x1fe0000 below the 128 KiB main stack, makes that allocation succeed and reaches the original PAL display-mode setup call.
