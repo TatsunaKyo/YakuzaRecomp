@@ -154,7 +154,7 @@ The next collection includes that archive and its directly related English stage
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE3.CVM:0x27952800:0xe1800 --range OGRE.CVM:0x156df800:0x2000 --output .\yakuza-boot-data-33.zip
 ```
 
-These two Dojima resources are not supplied yet. Stage loading, native sound and gameplay remain unverified.
+Bundle 33 supplies both Dojima resources. Their 931,840 payload bytes pass range-integrity and original-index checks, with all 36 earlier records unchanged. There are now 38 excerpt records covering 681 indexed data/audio files and ten complete movies. Stage loading, native sound and gameplay remain unverified.
 
 ## Import and run internally
 

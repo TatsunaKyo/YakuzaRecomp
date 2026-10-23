@@ -108,6 +108,8 @@ Remove-Item Env:YAKUZA_BOOT_DUMP_GS
 
 With `YAKUZA_BOOT_TRACE_MOVIE=1`, the continued probe also traces selected original PAL movie and thread calls, including frame wakeups and interrupt-budget handling. Bounded samples reset at each movie open; additional periodic samples keep later movies visible without logging every call. The trace records caller/argument addresses, movie mode and queue state, worker thread status and suspension/wakeup counts, and final call totals. Each observer invokes the original entry once and retains scheduler continuations. A return trace with `returned=0` can indicate a yield or a transfer to another decoded chunk. This diagnostic is disabled by default.
 
+The interrupt-budget observer wraps the registered entry at `0x00200c08`. Its generated wrapper calls `0x00200ae0` directly, so observing only the latter dispatch entry missed the interrupt calls. Moving this trace point records the existing activity without changing the handler or scheduler.
+
 ## IPU input and the MPEG wait helper
 
 With the supplied movie input, the original parser stalled while searching for an MPEG start code. Its cached input was `0x40000008`, the FDEC command it had issued. The pinned memory handler stored the command word and returned it as decoded data; it did not consume an IPU input stream.
@@ -221,7 +223,7 @@ A repeated-frame stall recurred in another run with the wakeup correction, so th
 
 Bundle 32 supplies all seven complete caption movies: 7,213,056 bytes in one range, with all 35 earlier records unchanged. Independent full video decoding passes for all seven 512×288 MPEG-2 streams at 30000/1001 fps. This brings supplied coverage to 679 indexed data/audio files and ten movies; independent decoding does not verify native playback or audio.
 
-The next clean, untraced native run passes the `CAPTION01.SFD` stop, renders its animated date and finishes without skip input. All 1,021,952 original movie bytes match EE RAM at `0x00c3dec0`. Execution then requests `/MEDIA3/ARC/ST_DOJIMA1.ARC`: 922,616 file bytes read as `OGRE3.CVM:0x27952800:0xe1800` (923,648 bytes). No additional missing indirect target or diagnostic timeout is reported. The [next collection](disc-ranges.md) includes the stage archive and its unobserved English stage-talk companion as two ranges totaling 931,840 bytes. These resources are not supplied yet; stage graphics, sound and gameplay remain unverified.
+The next clean, untraced native run passes the `CAPTION01.SFD` stop, renders its animated date and finishes without skip input. All 1,021,952 original movie bytes match EE RAM at `0x00c3dec0`. Execution then requests `/MEDIA3/ARC/ST_DOJIMA1.ARC`: 922,616 file bytes read as `OGRE3.CVM:0x27952800:0xe1800` (923,648 bytes). No additional missing indirect target or diagnostic timeout is reported. [Bundle 33](disc-ranges.md) now supplies the stage archive and its unobserved English stage-talk companion as two ranges totaling 931,840 bytes. All 36 previous excerpt records remain unchanged, bringing supplied coverage to 681 indexed data/audio files and ten movies. Stage graphics, sound and gameplay remain unverified.
 
 ## PAL native memory layout
 

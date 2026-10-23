@@ -50,7 +50,9 @@ std::array<ObservedCall, 12> movie_calls{{
     {0x1cf568, "movie try lock"}, {0x1cfc40, "movie mode"},
     {0x1050d0, "wake thread"}, {0x105130, "resume thread"},
     {0x1ca368, "open movie"}, {0x1ff7f8, "movie worker notification"},
-    {0x200c38, "movie frame wakeups"}, {0x200ae0, "movie interrupt budget"},
+    // The registered interrupt entry tail-calls 0x200ae0 directly in the
+    // generated source. Observe its entry so that call cannot bypass tracing.
+    {0x200c38, "movie frame wakeups"}, {0x200c08, "movie interrupt budget"},
 }};
 template<size_t Index> void observe_movie_call(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
     auto& call = movie_calls[Index];
