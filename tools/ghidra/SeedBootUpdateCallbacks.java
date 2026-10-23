@@ -88,6 +88,10 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
         collectCatalog(7, 0, 1, 5,
             "a4064fd42c263a9ea80c2b432763954cf4fc9d504990f3d20aa16a00a91428b0", entries,
             0x13b570L);
+        // New Game reaches the shared final method of this menu-phase
+        // family. Fingerprint every complete three-method table.
+        collectCatalog(5, 0x230d40L, 17, 27,
+            "3a121408a13ff24dd597d7031ae0069fa532e9763ae71efe0650703868d18d9c", entries);
         // Validate the entire catalog before changing any analysis metadata.
         for (long target : entries) {
             Address entry = toAddr(target);
@@ -115,6 +119,6 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             }
         }
         analyzeChanges(currentProgram);
-        println("Verified 265 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
+        println("Verified 282 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
     }
 }

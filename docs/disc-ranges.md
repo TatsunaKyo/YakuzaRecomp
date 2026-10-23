@@ -94,7 +94,15 @@ The next missing read is `/MEDIA/TALK/TITLE/TALK_TITLE.BIN`, a 5,024-byte file a
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x216e3800:0x6800 --output .\yakuza-boot-data-24.zip
 ```
 
-Upload that ZIP privately. The chapter-title file is included to reduce a separate upload and has not been requested by execution yet. Title rendering and native audio playback remain unverified.
+Bundle 24 supplies both complete files. Native execution passes the title-text read and renders the original Start prompt and main menu. Selecting New Game reaches a missing original callback, whose verified method-table family is now translated. The chapter-title companion has not been requested by execution yet. The title logo and background are absent in the current capture; native audio playback remains unverified.
+
+The v56 host passes the New Game callback and next requests `/MEDIA/ADVERTISE/CHAPTER1.DAT` at `OGRE.CVM:0x158000:0x65000`. Its 412,480-byte file occupies 413,696 bytes with sector padding. Collect the complete related 25-file advertise directory in one 8,701,952-byte range (about 8.3 MiB):
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x135000:0x84c800 --output .\yakuza-boot-data-25.zip
+```
+
+Upload that ZIP privately. This group includes the already supplied SEGA-logo and title-logo files; their overlapping bytes must match during import. The other chapter and advertise files are included to reduce later uploads and have not all been observed executing. The range starts at a new offset, avoiding an existing excerpt filename.
 
 ## Import and run internally
 
