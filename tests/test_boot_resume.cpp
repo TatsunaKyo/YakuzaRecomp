@@ -27,6 +27,19 @@ int main() {
         ps2_syscalls::WakeupThread(memory, &context, &runtime);
     check(ee.thread(id)->status == EeThreadStatus::Ready && ee.thread(id)->wakeupCount == 1,
           "Successful resume skipped the caller's ID-guarded wakeup");
+    check(GPR_S32((&context), 2) == id,
+          "Successful wakeup lost the target ID required to acknowledge the notification");
+
+    SET_GPR_S32((&context), 4, id);
+    runtime.handleSyscall(memory, &context, uint32_t(-0x34));
+    check(GPR_S32((&context), 2) == id && ee.thread(id)->wakeupCount == 2,
+          "Interrupt-safe wakeup lost the thread ID or queued notification");
+    SET_GPR_S32((&context), 4, 0x7fff);
+    ps2_syscalls::WakeupThread(memory, &context, &runtime);
+    check(GPR_S32((&context), 2) == -407, "Unknown-thread wakeup lost its real error");
+    SET_GPR_S32((&context), 4, 0);
+    ps2_syscalls::WakeupThread(memory, &context, &runtime);
+    check(GPR_S32((&context), 2) < 0, "Illegal-thread wakeup reported success");
 
     check(ee.suspendThread(id, false) == 0, "Worker did not suspend again");
     SET_GPR_S32((&context), 4, id);
@@ -38,5 +51,5 @@ int main() {
     SET_GPR_S32((&context), 4, 0x7fff);
     ps2_syscalls::ResumeThread(memory, &context, &runtime);
     check(GPR_S32((&context), 2) == -407, "Unknown-thread resume lost its real error");
-    std::cout << "Resume returns the real thread ID, permits the guarded wakeup and preserves errors\n";
+    std::cout << "Resume and wakeup return the real thread ID and preserve notifications and errors\n";
 }

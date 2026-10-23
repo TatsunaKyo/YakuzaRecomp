@@ -101,6 +101,14 @@ def main():
         // CRI frame loop checks that ID before waking its resumed worker.
         setReturnS32(ctx, result == 0 ? id : result);
 """)
+    thread = replace(thread, """            const int result = ee.wakeupThread(static_cast<int>(getRegU32(ctx, 4)), interruptSafe);
+            setReturnS32(ctx, result);
+""", """            const int id = static_cast<int>(getRegU32(ctx, 4));
+            const int result = ee.wakeupThread(id, interruptSafe);
+            // The EE wakeup ABI also returns the target ID. CRI only clears
+            // its pending notification after that acknowledgement succeeds.
+            setReturnS32(ctx, result == 0 ? id : result);
+""")
     texts["Kernel/Syscalls/Thread.cpp"] = thread
     include = args.runtime_dir.resolve() / "include"
     memory_header = (include / "runtime/ps2_memory.h").read_bytes().replace(b"\r\n", b"\n")
