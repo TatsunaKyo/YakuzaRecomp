@@ -15,9 +15,8 @@ def main():
     args = parser.parse_args()
     source_dir = args.iop_dir.resolve()
     output = args.out_dir.resolve()
-    project = Path(__file__).resolve().parents[1]
-    if output.is_relative_to(project) or output.is_relative_to(source_dir):
-        parser.error("Keep adapted IOP output outside both source checkouts")
+    if output.is_relative_to(source_dir):
+        parser.error("Keep adapted IOP output outside the pinned dependency checkout")
     data = (source_dir / "src/emulator/iop_emulator.cpp").read_bytes().replace(b"\r\n", b"\n")
     if hashlib.sha256(data).hexdigest() != SOURCE_SHA256:
         parser.error("Unsupported IOP emulator source; reassess the pinned adaptation")
