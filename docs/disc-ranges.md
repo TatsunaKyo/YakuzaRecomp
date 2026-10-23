@@ -102,7 +102,15 @@ The v56 host passes the New Game callback and next requests `/MEDIA/ADVERTISE/CH
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x135000:0x84c800 --output .\yakuza-boot-data-25.zip
 ```
 
-Upload that ZIP privately. This group includes the already supplied SEGA-logo and title-logo files; their overlapping bytes must match during import. The other chapter and advertise files are included to reduce later uploads and have not all been observed executing. The range starts at a new offset, avoiding an existing excerpt filename.
+Bundle 25 supplies the complete group. Its overlapping bytes match the earlier SEGA-logo and title-logo files, and all previous excerpt records are preserved. The other chapter and advertise files are included to reduce later uploads and have not all been observed executing. The range starts at a new offset, avoiding an existing excerpt filename.
+
+With bundle 25 supplied, the native run passes `CHAPTER1.DAT` and displays the original Chapter 1 heading. It next requests `/MEDIA/MISSION/MSSN41XX/MSSN4154.DAT`: a 6,656-byte file at `OGRE.CVM:0x3738800`, read with padding as 8,192 bytes. The complete mission tree contains 459 files in one contiguous 7,317,504-byte range (about 7 MiB):
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x314d000:0x6fa800 --output .\yakuza-boot-data-26.zip
+```
+
+Upload that ZIP privately. This includes the observed request and 47 already supplied mission files, whose overlapping bytes must match. Other mission files are collected in advance to reduce later uploads and have not all been observed executing. The range uses a new start, avoiding a conflicting existing excerpt filename.
 
 ## Import and run internally
 
