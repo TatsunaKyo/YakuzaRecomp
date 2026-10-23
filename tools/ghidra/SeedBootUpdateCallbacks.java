@@ -73,6 +73,11 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
         collectCatalog(31, 0, 1, 29,
             "d0abe1bd38ce9377a47151d78b9fb500f01857941aa669b951a5e32d04b1070a", entries,
             0x13da20L);
+        // Opening-scene execution reaches this 46-method interface after
+        // loading OPENING_MOVIE.DAT and its B00 companion.
+        collectCatalog(48, 0, 1, 46,
+            "c2df386a06ebe5d6f8940e54a609d75f863bf2f4de402551ea69df49b5384361", entries,
+            0x13d770L);
         // Validate the entire catalog before changing any analysis metadata.
         for (long target : entries) {
             Address entry = toAddr(target);
@@ -100,6 +105,6 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             }
         }
         analyzeChanges(currentProgram);
-        println("Verified 260 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
+        println("Verified 261 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
     }
 }

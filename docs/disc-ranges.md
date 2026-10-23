@@ -46,6 +46,8 @@ Bundle 13 supplies `MSSN1020.DAT` at `OGRE.CVM:0x31f2000:0x800`. The full sector
 
 Bundle 14 supplies both opening-scene files. The next run reads both sectors and reaches `/MEDIA2/MOVIE/OPENING_MOVIE.SFD`, a separate 59,004,928-byte cinematic. The first missing read is `OGRE2.CVM:0x93e1f000:0x100000`. The complete indexed file fits three collections: `OGRE2.CVM:0x93e1f000:0x1800000`, `OGRE2.CVM:0x9561f000:0x1800000` and `OGRE2.CVM:0x96e1f000:0x845800`. Each stays within the existing range, ZIP and upload limits. These requested bytes are not yet supplied; playback of this cinematic remains unverified.
 
+Bundles 15 through 17 now supply all three parts. Their combined length matches the complete indexed `OPENING_MOVIE.SFD`; both this cinematic and the earlier `SEGALOGO.SFD` are available privately. After import, execution reaches an opening-scene interface callback before the cinematic read completes. Further translation is in progress; supplying the data does not establish successful playback.
+
 ## Import and run internally
 
 ```sh
