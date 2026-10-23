@@ -12,7 +12,7 @@ With Visual Studio 2022's C++ workload, Git, Python 3.10+ and CMake installed, u
 cmake -S . -B "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" -A x64 `
   -DYAKUZA_BUILD_BOOT_PROBE=ON `
   -DYAKUZA_MAIN_GENERATED_DIR="D:\Yakuza Research\generated-pal-probe" `
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v56\generated" `
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v57\generated" `
   -DYAKUZA_BOOT_OVERLAY_DIRS="D:\Yakuza Research\overlay-analysis-boot-v3\game" `
   -DPS2X_ENABLE_FFMPEG=OFF
 cmake --build "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" --config Debug --parallel 2 --target yakuza_boot_probe
@@ -39,7 +39,7 @@ cmake -S . -B /workspace/scratch/yakuza-pal/boot-build -G Ninja \
   -DCMAKE_PREFIX_PATH=/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr \
   -DYAKUZA_BUILD_BOOT_PROBE=ON \
   -DYAKUZA_MAIN_GENERATED_DIR=/workspace/scratch/yakuza-pal/generated-pal-probe \
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v56/generated \
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v57/generated \
   -DYAKUZA_BOOT_OVERLAY_DIRS=/workspace/scratch/yakuza-pal/overlay-analysis-boot-v3/game
 cmake --build /workspace/scratch/yakuza-pal/boot-build --target yakuza_boot_probe --parallel 2
 python tools/run_boot_probe.py \
@@ -229,7 +229,11 @@ A repeated-frame stall recurred in another run with the wakeup correction, so th
 
 Bundle 32 supplies all seven complete caption movies: 7,213,056 bytes in one range, with all 35 earlier records unchanged. Independent full video decoding passes for all seven 512×288 MPEG-2 streams at 30000/1001 fps. This brings supplied coverage to 679 indexed data/audio files and ten movies; independent decoding does not verify native playback or audio.
 
-The next clean, untraced native run passes the `CAPTION01.SFD` stop, renders its animated date and finishes without skip input. All 1,021,952 original movie bytes match EE RAM at `0x00c3dec0`. Execution then requests `/MEDIA3/ARC/ST_DOJIMA1.ARC`: 922,616 file bytes read as `OGRE3.CVM:0x27952800:0xe1800` (923,648 bytes). No additional missing indirect target or diagnostic timeout is reported. [Bundle 33](disc-ranges.md) now supplies the stage archive and its unobserved English stage-talk companion as two ranges totaling 931,840 bytes. All 36 previous excerpt records remain unchanged, bringing supplied coverage to 681 indexed data/audio files and ten movies. Stage graphics, sound and gameplay remain unverified.
+The next clean, untraced native run passes the `CAPTION01.SFD` stop, renders its animated date and finishes without skip input. All 1,021,952 original movie bytes match EE RAM at `0x00c3dec0`. Execution then requests `/MEDIA3/ARC/ST_DOJIMA1.ARC`: 922,616 file bytes read as `OGRE3.CVM:0x27952800:0xe1800` (923,648 bytes). No additional missing indirect target or diagnostic timeout is reported. [Bundle 33](disc-ranges.md) now supplies the stage archive and its English stage-talk companion as two ranges totaling 931,840 bytes. All 36 previous excerpt records remain unchanged, bringing supplied coverage to 681 indexed data/audio files and ten movies.
+
+A subsequent native run passes the caption and loads both Dojima resources. The complete 922,616-byte archive matches EE RAM at `0x018f4780`; all 7,508 companion bytes match at `0x006f5240`. Execution next calls the original method at `0x0024c7b0` from `0x0024bec0`, through slot `0x18` of table `0x0013d900`. Sixteen related tables share first method `0x0024c7e0` and contain 65 distinct methods. The recovery script fingerprints every complete table, rejects altered catalog words before changing metadata, and identifies the original code without changing instruction bytes. All 332,035 previous callable entries remain registered; the updated map adds 59, totaling 332,094. The full catalog now covers 297 distinct tables and 889 methods, counting the previously known `0x0013da00` table once. Stage graphics, sound and gameplay remain unverified.
+
+Supplement v57 contains 394 ranges and 6,119 instructions; the complete decoded map contains 764,259 original instructions. Generation reports zero errors, unhandled instructions or correctness-critical fallbacks, with 84 control-flow warnings in 42 functions. Sixty altered-word catalog checks reject unsupported data before metadata changes; a supported repeat adds no further functions. Both full hosts build for Linux and Windows x64. The full setup replay passes nine default checks, eight boot checks and the deliberate original MAIN-entry checkpoint. This does not establish execution through the newly recovered callback or original-game Windows gameplay.
 
 ## PAL native memory layout
 

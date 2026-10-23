@@ -34,6 +34,8 @@ After the cinematic, native execution loads the supplied mission, title, stage a
 
 The native IOP now defers sound-DMA interrupts while global interrupts are disabled. A synthetic regression checks both DMA cores, nested critical sections and delivery after interrupts are restored. Its effect on movie stability and native audio remains under test.
 
+A later native run loads both Dojima resources: the complete 922,616-byte stage archive and 7,508-byte English companion match game memory exactly. The next original callback exposed another family of 16 method tables. Its 65 methods are now translated, with all earlier callable entries retained. Stage presentation and gameplay remain unverified.
+
 A [Windows collection tool](docs/disc-ranges.md) reads an extracted disc folder, `.iso` or `.iso.gz` and copies exact original ranges into a private ZIP. Compressed images do not require a full decompressed copy. The complete three archives remain absent; related files are grouped when practical to reduce separate uploads.
 
 The supplied `PAL_NTSC.DAT` now loads through the original disc-read path. Native vertical-blank and recursive-dispatch fixes address observed stack corruption. A first-port controller adapter passes host keyboard input into the original PAL selection code; an X key press is observed as Cross. Execution then reaches filesystem and archive initialization. A priority-syscall correction lets the original I/O workers run, and supplemental translation retains previously identified callback entries. A VIF transfer-boundary correction removes control words from image uploads. The captured memory-card dialog is now readable, and its entire 32 KiB font texture and 64-byte palette match their original EE upload sources byte for byte. Other graphics remain unverified.
@@ -43,7 +45,7 @@ There is no release date yet. Completing translation is one part of the work; ru
 ## Current evidence
 
 - Resident and MAIN overlay code analyzed with the PS2 R5900 Ghidra extension.
-- Nine original method-table catalogs verified by SHA-256: 282 tables containing 829 distinct methods. Analysis identifies previously missing callback entries while preserving original instruction bytes. This does not establish execution coverage for every method.
+- Ten original method-table catalogs verified by SHA-256: 297 distinct tables containing 889 methods. Analysis identifies previously missing callback entries while preserving original instruction bytes. This does not establish execution coverage for every method.
 - A broader scan verifies 468 long interface tables containing 3,460 distinct method pointers, plus fingerprints of 60 previously unregistered entries. These tables overlap earlier catalogs. Supplemental translation registers every method pointer and retains earlier callable addresses.
 - Movie driver analysis verifies three original driver variants and all 98 method slots in their seven interfaces. Supplemental translation registers every verified method pointer and retains prior callable entries; altered descriptor and method data are rejected before analysis changes.
 - A static generation probe reports zero unhandled-instruction errors, with unresolved control-flow warnings still remaining.

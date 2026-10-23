@@ -11,6 +11,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashSet;
 
 public class SeedBootUpdateCallbacks extends GhidraScript {
+    private final LinkedHashSet<Long> verifiedTables = new LinkedHashSet<>();
     private void collectCatalog(int wordCount, long finalMethod, int expectedTables,
             int expectedMethods, String expectedDigest, LinkedHashSet<Long> allEntries,
             long... explicitTables) throws Exception {
@@ -19,6 +20,7 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
         // in ascending address order, encoded as little-endian uint32s.
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         LinkedHashSet<Long> entries = new LinkedHashSet<>();
+        LinkedHashSet<Long> tables = new LinkedHashSet<>();
         int tableCount = 0;
         boolean explicit = explicitTables.length != 0;
         long candidates = explicit ? explicitTables.length : (0x56280L - wordCount * 4L) / 4 + 1;
@@ -43,12 +45,14 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             for (long word : words) record.putInt((int)word);
             digest.update(record.array());
             ++tableCount;
+            tables.add(table);
             for (int i = 2; i < wordCount; ++i) entries.add(words[i]);
         }
         if (tableCount != expectedTables || entries.size() != expectedMethods ||
                 !HexFormat.of().formatHex(digest.digest()).equals(expectedDigest))
             throw new IllegalStateException("Original PAL update method catalog differs");
         allEntries.addAll(entries);
+        verifiedTables.addAll(tables);
     }
 
     public void run() throws Exception {
@@ -92,6 +96,13 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
         // family. Fingerprint every complete three-method table.
         collectCatalog(5, 0x230d40L, 17, 27,
             "3a121408a13ff24dd597d7031ae0069fa532e9763ae71efe0650703868d18d9c", entries);
+        // Dojima loading reaches slot 0x18 in the first of these five-method
+        // interfaces. All sixteen share 0x24c7e0 as their first method.
+        collectCatalog(7, 0, 16, 65,
+            "eeabfa0c0111d9ddcb0f148413081cb420a7f707d25b4994d76f790ea7abe20d", entries,
+            0x13d900L, 0x13d920L, 0x13d940L, 0x13d960L, 0x13d980L, 0x13d9a0L,
+            0x13d9c0L, 0x13d9e0L, 0x13da00L, 0x1421a0L, 0x143580L, 0x1435f0L,
+            0x1436f0L, 0x1444a0L, 0x144630L, 0x146a20L);
         // Validate the entire catalog before changing any analysis metadata.
         for (long target : entries) {
             Address entry = toAddr(target);
@@ -119,6 +130,6 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             }
         }
         analyzeChanges(currentProgram);
-        println("Verified 282 original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
+        println("Verified " + verifiedTables.size() + " distinct original PAL tables / " + entries.size() + " methods; identified " + created + " new entries");
     }
 }
