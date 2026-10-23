@@ -130,6 +130,14 @@ python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz
 
 Bundles 29 and 30 supply the complete movie through `0x4dead000`; their adjacent payloads are 24 MiB and about 14 MiB. All previous excerpt records remain unchanged. An independent full video decode passes: the stream is 512×288 MPEG-2 video at 30000/1001 fps, about 46 seconds long. This checks the supplied file, not native playback. The earlier SEGA-logo and opening movies remain complete and are not part of this collection.
 
+After a native wakeup acknowledgement correction, the clean Linux run renders the Chapter 1 movie through its closing fade without skip input and reaches `/MEDIA2/AUTHOR/CAPTION/CAPTION01.DAT`. This 2,448-byte file requires a 4,096-byte sector read at `OGRE2.CVM:0x77800`. The next collection covers all 16 files in its caption directory as one 57,344-byte range (56 KiB), ending at `0x84000`:
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x76000:0xe000 --output .\yakuza-boot-data-31.zip
+```
+
+Only `CAPTION01.DAT` is the observed request; the other caption files are included to reduce separate small uploads. Their bytes are not supplied yet. Native picture colors and the corrupted bottom strip remain unresolved; this movie transition does not establish correct complete playback, sound or gameplay.
+
 ## Import and run internally
 
 ```sh
