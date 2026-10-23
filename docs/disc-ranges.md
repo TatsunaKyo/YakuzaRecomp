@@ -58,13 +58,19 @@ python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz
 
 Bundle 19 supplies the title-logo range. The next Linux run passes the earlier missing read. Its EE memory copy matches 391,104 of the 391,168 supplied bytes; 64 bytes have changed during execution, so this is not a byte-identical whole-range comparison. The cause of those changes is not established.
 
-Execution then requests `/MEDIA/STGTALK/BRI/ST_RES.BIN`: 7,508 file bytes at `OGRE.CVM:0x166c8000`, read as an 8,192-byte sector range. This is the current data blocker. Collect it with:
+Execution then requests `/MEDIA/STGTALK/BRI/ST_RES.BIN`: 7,508 file bytes at `OGRE.CVM:0x166c8000`, read as an 8,192-byte sector range. Bundle 20 supplies this range. Its complete sector range now matches EE RAM. It was collected with:
 
 ```powershell
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x166c8000:0x2000 --output .\yakuza-boot-data-20.zip
 ```
 
-Upload that ZIP privately. A rendered title screen remains unverified; the latest captured frame is still from the opening cinematic.
+The next observed missing read is `/MEDIA/STAGE/ST_RES/TALK_ST_RES.BIN` at `OGRE.CVM:0x1408e000:0x800`: a 192-byte file with sector padding. This file belongs to a separate stage directory containing ten files in one contiguous 530,432-byte range (518 KiB). The next collection includes that complete group to reduce repeated small uploads:
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x1404c800:0x81800 --output .\yakuza-boot-data-21.zip
+```
+
+Upload that ZIP privately. `TALK_ST_RES.BIN` is the observed request; the other nine files are related stage assets included in advance. They have not all been requested by execution yet. This group differs from the supplied `STGTALK/BRI/ST_RES.BIN`. Title-screen rendering remains unverified; the latest capture still shows the cinematic.
 
 ## Import and run internally
 
