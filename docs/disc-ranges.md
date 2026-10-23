@@ -78,7 +78,15 @@ After the stage-resource translation, execution passes the missing callback and 
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0xef0800:0x236800 --output .\yakuza-boot-data-22.zip
 ```
 
-Upload that ZIP privately. It includes the previously supplied `CSE_STAY.DAT`; the importer verifies the overlap and keeps earlier records. The other files are grouped to reduce further uploads and have not all been requested by execution. The range starts at a new offset, avoiding an existing excerpt filename. Title rendering remains unverified.
+Bundle 22 supplies this group. The importer verifies its overlap with the previously supplied `CSE_STAY.DAT` and keeps the earlier records. The other files are grouped to reduce further uploads and have not all been requested by execution. The range starts at a new offset, avoiding an existing excerpt filename.
+
+The next native run passes `CSE_TITLE.DAT` and requests `/MEDIA2/BGM/TITLE.ADX` at `OGRE2.CVM:0x4b654800:0xc800`. This is the first 51,200-byte read of a 2,058,240-byte title-music stream. The next collection includes the complete stream plus the adjacent `TITLE_CHAP.ADX` and `TITLE_ORDER.ADX` files in one 2,484,224-byte range (about 2.4 MiB):
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x4b654800:0x25e800 --output .\yakuza-boot-data-23.zip
+```
+
+Upload that ZIP privately. Only the main title-track request has been observed; the two other tracks are grouped to reduce separate uploads. Title rendering and audio playback remain unverified.
 
 ## Import and run internally
 
