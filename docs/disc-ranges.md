@@ -56,7 +56,15 @@ The next Linux run reads `MSSN1040.DAT`; its full 2,048-byte sector matches EE R
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x922000:0x5f800 --output .\yakuza-boot-data-19.zip
 ```
 
-Upload that ZIP privately. The title-logo read is the current data blocker; the title screen has not rendered yet.
+Bundle 19 supplies the title-logo range. The next Linux run passes the earlier missing read. Its EE memory copy matches 391,104 of the 391,168 supplied bytes; 64 bytes have changed during execution, so this is not a byte-identical whole-range comparison. The cause of those changes is not established.
+
+Execution then requests `/MEDIA/STGTALK/BRI/ST_RES.BIN`: 7,508 file bytes at `OGRE.CVM:0x166c8000`, read as an 8,192-byte sector range. This is the current data blocker. Collect it with:
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x166c8000:0x2000 --output .\yakuza-boot-data-20.zip
+```
+
+Upload that ZIP privately. A rendered title screen remains unverified; the latest captured frame is still from the opening cinematic.
 
 ## Import and run internally
 
