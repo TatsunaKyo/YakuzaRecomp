@@ -12,7 +12,7 @@ With Visual Studio 2022's C++ workload, Git, Python 3.10+ and CMake installed, u
 cmake -S . -B "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" -A x64 `
   -DYAKUZA_BUILD_BOOT_PROBE=ON `
   -DYAKUZA_MAIN_GENERATED_DIR="D:\Yakuza Research\generated-pal-probe" `
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v42\generated" `
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v56\generated" `
   -DYAKUZA_BOOT_OVERLAY_DIRS="D:\Yakuza Research\overlay-analysis-boot-v3\game" `
   -DPS2X_ENABLE_FFMPEG=OFF
 cmake --build "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" --config Debug --parallel 2 --target yakuza_boot_probe
@@ -39,7 +39,7 @@ cmake -S . -B /workspace/scratch/yakuza-pal/boot-build -G Ninja \
   -DCMAKE_PREFIX_PATH=/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr \
   -DYAKUZA_BUILD_BOOT_PROBE=ON \
   -DYAKUZA_MAIN_GENERATED_DIR=/workspace/scratch/yakuza-pal/generated-pal-probe \
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v42/generated \
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v56/generated \
   -DYAKUZA_BOOT_OVERLAY_DIRS=/workspace/scratch/yakuza-pal/overlay-analysis-boot-v3/game
 cmake --build /workspace/scratch/yakuza-pal/boot-build --target yakuza_boot_probe --parallel 2
 python tools/run_boot_probe.py \
@@ -96,7 +96,7 @@ The memory-card dialog exposed a VIF1 transfer-boundary bug. Its font texture in
 
 [prepare_vif.py](../tools/prepare_vif.py) keeps DIRECT payload length separate from pending GIF IMAGE length. It parses the intervening VIF codes, forwards only declared DIRECT payload bytes, retains DIRECT uploads split across DMA/FIFO deliveries, and clears both states on VIF reset. It preserves the original pixels and palette. A display-free synthetic regression compares every transported image byte, includes pixel data resembling commands, and checks split deliveries, continuation through multiple DIRECT commands, the following command and reset. The test fails against the previous interpreter. In a subsequent original-game run, the entire 32,768-byte font texture and 64-byte palette in GS memory match their EE sources exactly. Captured dialog text is readable. That run advanced to the then-missing `MSSN1010.DAT` sector; this verifies the observed upload and dialog, without establishing complete graphics correctness.
 
-For local graphics debugging, set `YAKUZA_BOOT_DUMP_GS=1` before a continued run. At shutdown, the host writes `state/graphics/gs-trace.txt`, `gs-vram.bin` and `ee-ram.bin` beneath the selected state directory. The text includes recent GS events and texture state; the binary snapshots contain 4 MiB of GS VRAM and 32 MiB of emulated EE RAM. These diagnostics contain original game data and belong outside the public checkout. Recording is disabled by default. In PowerShell:
+For local graphics debugging, set `YAKUZA_BOOT_DUMP_GS=1` before a continued run. At shutdown, the host writes `state/graphics/gs-trace.txt`, `gs-vram.bin` and `ee-ram.bin` beneath the selected state directory. The text includes presentation dimensions and framebuffer selection, the current image-transfer destination and progress, recent GS events and texture state. The binary snapshots contain 4 MiB of GS VRAM and 32 MiB of emulated EE RAM. These diagnostics contain original game data and belong outside the public checkout. Recording is disabled by default. In PowerShell:
 
 ```powershell
 $env:YAKUZA_BOOT_DUMP_GS = "1"
@@ -211,7 +211,7 @@ The Chapter 1 author directory contains 129 scene-data files occupying 45,701,12
 
 Bundles 27 and 28 supply both adjacent scene-data ranges, completing all 129 original indexed files, including `AUTH_CHAPTER01_008.DAT` across the boundary. Every earlier excerpt record remains unchanged. The next run with the unchanged v56 host passes the first scene-descriptor stop and requests the initial 1,048,576 bytes of `/MEDIA2/MOVIE/AUTH_CHAPTER01_001.SFD` at `OGRE2.CVM:0x4b8b3000`. No further missing indirect target is observed. The descriptor and companion sectors are not retained as complete identical ranges in final RAM; no whole-sector equality is claimed, and the companion's individual read is not independently established by the capped log.
 
-This Chapter 1 movie is a separate indexed file of 39,821,312 bytes. The next collection covers it completely as two private chunks: `OGRE2.CVM:0x4b8b3000:0x1800000` (25,165,824 bytes) and `OGRE2.CVM:0x4d0b3000:0xdfa000` (14,655,488 bytes). Together they end at `0x4dead000`. The earlier SEGA-logo and opening movies remain complete and are not requested again. Native Chapter 1 movie playback, scene image graphics, audio, gameplay and original-game Windows execution remain unverified. Current supplied ranges contain 663 complete indexed data/audio files and the two earlier complete movies; this does not establish execution coverage for every file.
+This Chapter 1 movie is a separate indexed file of 39,821,312 bytes. Supplied bundles 29 and 30 cover it completely as two private chunks: `OGRE2.CVM:0x4b8b3000:0x1800000` (25,165,824 bytes) and `OGRE2.CVM:0x4d0b3000:0xdfa000` (14,655,488 bytes). Together they end at `0x4dead000`. All earlier excerpt records remain unchanged. An independent full video decode passes: 512×288 MPEG-2 at 30000/1001 fps, about 46 seconds long. The native Linux host renders moving Kamurocho footage, but a color cast, a corrupted bottom strip and an intermittent repeated-frame stall remain under investigation. Automatic movie completion, audio, gameplay and original-game Windows execution remain unverified. Current supplied ranges contain 663 complete indexed data/audio files and three complete movies; this does not establish execution coverage for every file.
 
 ## PAL native memory layout
 

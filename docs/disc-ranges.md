@@ -128,7 +128,7 @@ python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x4d0b3000:0xdfa000 --output .\yakuza-boot-data-30.zip
 ```
 
-Upload both ZIPs privately. Their payloads are 24 MiB and about 14 MiB, and together cover the exact complete file through `0x4dead000`. This groups the full stream to avoid repeated movie-chunk requests. The earlier SEGA-logo and opening movies are already complete and are not part of this collection. Native Chapter 1 movie playback remains unverified.
+Bundles 29 and 30 supply the complete movie through `0x4dead000`; their adjacent payloads are 24 MiB and about 14 MiB. All previous excerpt records remain unchanged. An independent full video decode passes: the stream is 512×288 MPEG-2 video at 30000/1001 fps, about 46 seconds long. This checks the supplied file, not native playback. The earlier SEGA-logo and opening movies remain complete and are not part of this collection.
 
 ## Import and run internally
 

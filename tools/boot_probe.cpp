@@ -95,6 +95,16 @@ void dump_graphics(PS2Runtime& runtime, const std::filesystem::path& folder) {
     if (!ipu_trace) throw std::runtime_error("Cannot write private IPU state");
     std::ofstream trace(folder / "gs-trace.txt");
     const auto snapshot = runtime.gs().getDebugSnapshot();
+    trace << "presentation=" << snapshot.hostPresentationWidth << ',' << snapshot.hostPresentationHeight
+          << " display_fbp=" << snapshot.hostPresentationDisplayFbp
+          << " source_fbp=" << snapshot.hostPresentationSourceFbp
+          << " preferred=" << snapshot.hostPresentationUsedPreferred
+          << " valid=" << snapshot.hasHostPresentationFrame << '\n';
+    trace << "transfer=" << snapshot.bitbltbuf.dbp << ',' << unsigned(snapshot.bitbltbuf.dbw)
+          << ',' << unsigned(snapshot.bitbltbuf.dpsm)
+          << " origin=" << snapshot.trxpos.dsax << ',' << snapshot.trxpos.dsay
+          << " size=" << snapshot.trxreg.rrw << ',' << snapshot.trxreg.rrh
+          << " copied=" << snapshot.transferCopiedPixels << '/' << snapshot.transferTotalPixels << '\n';
     for (unsigned i = 0; i < 2; ++i) {
         const auto& ctx = snapshot.ctx[i];
         const auto& tex = ctx.tex0;
