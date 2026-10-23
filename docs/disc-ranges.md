@@ -136,7 +136,7 @@ After a native wakeup acknowledgement correction, the clean Linux run renders th
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x76000:0xe000 --output .\yakuza-boot-data-31.zip
 ```
 
-Only `CAPTION01.DAT` is the observed request; the other caption files are included to reduce separate small uploads. Their bytes are not supplied yet. Native picture colors and the corrupted bottom strip remain unresolved; this movie transition does not establish correct complete playback, sound or gameplay.
+Bundle 31 supplies all 16 caption files, and all 34 previous excerpt records remain unchanged. Only `CAPTION01.DAT` was the observed request; the other caption files are companions included to reduce separate small uploads. Native caption processing is being checked. Picture colors, the corrupted bottom strip and an intermittent repeated-frame stall remain unresolved; the earlier movie transition does not establish correct complete playback, sound or gameplay.
 
 ## Import and run internally
 

@@ -106,7 +106,7 @@ $env:YAKUZA_BOOT_DUMP_GS = "1"
 Remove-Item Env:YAKUZA_BOOT_DUMP_GS
 ```
 
-With `YAKUZA_BOOT_TRACE_MOVIE=1`, the continued probe also traces selected original PAL movie and thread calls. It logs bounded samples, caller/argument addresses, movie mode and queue state, and final call totals. Each observer invokes the original entry once and retains scheduler continuations. A return trace with `returned=0` can indicate a yield or a transfer to another decoded chunk. Thread snapshots include suspend/wakeup counts and callback depth. This diagnostic is disabled by default.
+With `YAKUZA_BOOT_TRACE_MOVIE=1`, the continued probe also traces selected original PAL movie and thread calls, including frame wakeups and interrupt-budget handling. Bounded samples reset at each movie open; additional periodic samples keep later movies visible without logging every call. The trace records caller/argument addresses, movie mode and queue state, worker thread status and suspension/wakeup counts, and final call totals. Each observer invokes the original entry once and retains scheduler continuations. A return trace with `returned=0` can indicate a yield or a transfer to another decoded chunk. This diagnostic is disabled by default.
 
 ## IPU input and the MPEG wait helper
 
@@ -215,7 +215,7 @@ Bundles 27 and 28 supply both adjacent scene-data ranges, completing all 129 ori
 
 This Chapter 1 movie is a separate indexed file of 39,821,312 bytes. Supplied bundles 29 and 30 cover it completely as two private chunks: `OGRE2.CVM:0x4b8b3000:0x1800000` (25,165,824 bytes) and `OGRE2.CVM:0x4d0b3000:0xdfa000` (14,655,488 bytes). Together they end at `0x4dead000`. All earlier excerpt records remain unchanged. An independent full video decode passes: 512×288 MPEG-2 at 30000/1001 fps, about 46 seconds long. The native Linux host renders moving Kamurocho footage. After the wakeup acknowledgement correction, a clean run passes the closing fade without skip input and reaches the next caption request. A color cast and corrupted bottom strip remain. Correct complete playback, audio, gameplay and original-game Windows execution remain unverified. Current supplied ranges contain 663 complete indexed data/audio files and three complete movies; this does not establish execution coverage for every file.
 
-The next missing file is `/MEDIA2/AUTHOR/CAPTION/CAPTION01.DAT`, 2,448 bytes at `OGRE2.CVM:0x77800`, read as a padded 4,096-byte range. The complete 16-file caption directory fits `OGRE2.CVM:0x76000:0xe000` (57,344 bytes). This range is not supplied yet; the [collection command](disc-ranges.md) batches its companions. The continued run exits nonzero at this data boundary, with no further missing indirect target or diagnostic timeout.
+The movie-exit run next requests `/MEDIA2/AUTHOR/CAPTION/CAPTION01.DAT`, 2,448 bytes at `OGRE2.CVM:0x77800`, read as a padded 4,096-byte range. The complete 16-file caption directory fits `OGRE2.CVM:0x76000:0xe000` (57,344 bytes). Bundle 31 now supplies this whole group; all 34 previous excerpt records remain unchanged. There are now 679 complete indexed data/audio files and three complete movies. Native caption processing is being checked. A repeated-frame stall recurred in another run with the wakeup correction, so that correction does not establish complete playback reliability.
 
 ## PAL native memory layout
 

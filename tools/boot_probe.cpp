@@ -40,25 +40,50 @@ struct ObservedCall {
     const char* name;
     PS2Runtime::RecompiledFunction original = nullptr;
     unsigned calls = 0, pending_calls = 0, worker_calls = 0;
+    unsigned epoch = 0, scene_calls = 0, periodic_samples = 0;
+    std::chrono::steady_clock::time_point next_sample{};
 };
-std::array<ObservedCall, 10> movie_calls{{
+unsigned movie_trace_epoch = 0;
+std::array<ObservedCall, 12> movie_calls{{
     {0x1cfbb0, "movie foreground server"}, {0x1cfbf8, "movie background server"},
     {0x1cfe60, "movie server gate"}, {0x1cf728, "movie request"},
     {0x1cf568, "movie try lock"}, {0x1cfc40, "movie mode"},
     {0x1050d0, "wake thread"}, {0x105130, "resume thread"},
     {0x1ca368, "open movie"}, {0x1ff7f8, "movie worker notification"},
+    {0x200c38, "movie frame wakeups"}, {0x200ae0, "movie interrupt budget"},
 }};
 template<size_t Index> void observe_movie_call(uint8_t* memory, R5900Context* ctx, PS2Runtime* runtime) {
     auto& call = movie_calls[Index];
+    if constexpr (Index == 8) ++movie_trace_epoch;
+    if (call.epoch != movie_trace_epoch) {
+        call.epoch = movie_trace_epoch;
+        call.scene_calls = call.pending_calls = call.worker_calls = call.periodic_samples = 0;
+        call.next_sample = {};
+    }
     const auto argument = GPR_U32(ctx, 4), caller = GPR_U32(ctx, 31);
     const bool pending = Ps2FastRead32(memory, 0x44c5f0) == 1;
-    const bool record = ++call.calls <= 4 || (pending && ++call.pending_calls <= 8) ||
-        ((Index == 6 || Index == 7) && argument == 8 && ++call.worker_calls <= 16);
+    ++call.calls;
+    const auto now = std::chrono::steady_clock::now();
+    const bool periodic = now >= call.next_sample && call.periodic_samples < 32;
+    if (periodic) {
+        ++call.periodic_samples;
+        call.next_sample = now + std::chrono::seconds(5);
+    }
+    const bool record = ++call.scene_calls <= 4 || (pending && ++call.pending_calls <= 8) ||
+        ((Index == 6 || Index == 7) && argument == 8 && ++call.worker_calls <= 16) || periodic;
     if (record) std::cout << "[yakuza-movie:call] " << call.name << " entry=0x" << std::hex
         << call.address << " caller=0x" << caller << " a0=0x" << argument
         << " mode=" << Ps2FastRead32(memory, 0x44c3e8)
         << " lock=" << Ps2FastRead32(memory, 0x44c430) << " pending=" << pending
-        << " thread=" << runtime->eeScheduler().currentThreadId() << std::dec << '\n';
+        << " thread=" << runtime->eeScheduler().currentThreadId()
+        << " scene=" << movie_trace_epoch << std::dec << '\n';
+    if (record) if (const auto* worker = runtime->eeScheduler().thread(8))
+        std::cout << "[yakuza-movie:worker] status=" << unsigned(worker->status)
+                  << " suspends=" << worker->suspendCount << " wakes=" << worker->wakeupCount
+                  << " wait=" << unsigned(worker->wait.reason)
+                  << " pc=0x" << std::hex << worker->activeContext().pc
+                  << " budget=" << Ps2FastRead32(memory, 0x453dbc)
+                  << " active=" << Ps2FastRead32(memory, 0x453cf4) << std::dec << '\n';
     // Invoke the real entry once. Incomplete calls retain their original PC
     // and scheduler continuation; tracing never completes or skips a call.
     call.original(memory, ctx, runtime);
@@ -71,6 +96,7 @@ void install_movie_trace(PS2Runtime& runtime) {
         observe_movie_call<0>, observe_movie_call<1>, observe_movie_call<2>, observe_movie_call<3>,
         observe_movie_call<4>, observe_movie_call<5>, observe_movie_call<6>, observe_movie_call<7>,
         observe_movie_call<8>, observe_movie_call<9>,
+        observe_movie_call<10>, observe_movie_call<11>,
     };
     for (size_t i = 0; i < movie_calls.size(); ++i) {
         auto& call = movie_calls[i];
