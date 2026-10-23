@@ -219,6 +219,10 @@ The movie-exit run next requests `/MEDIA2/AUTHOR/CAPTION/CAPTION01.DAT`, 2,448 b
 
 A repeated-frame stall recurred in another run with the wakeup correction, so that correction does not establish complete playback reliability. The successful comparison leaves the chapter-title screen to advance without the earlier optional Cross press and sends no movie skip input. This does not prove input timing causes the stall. Movie tracing is disabled for that run; the new tracing is validated separately against actual native execution.
 
+Bundle 32 supplies all seven complete caption movies: 7,213,056 bytes in one range, with all 35 earlier records unchanged. Independent full video decoding passes for all seven 512×288 MPEG-2 streams at 30000/1001 fps. This brings supplied coverage to 679 indexed data/audio files and ten movies; independent decoding does not verify native playback or audio.
+
+The next clean, untraced native run passes the `CAPTION01.SFD` stop, renders its animated date and finishes without skip input. All 1,021,952 original movie bytes match EE RAM at `0x00c3dec0`. Execution then requests `/MEDIA3/ARC/ST_DOJIMA1.ARC`: 922,616 file bytes read as `OGRE3.CVM:0x27952800:0xe1800` (923,648 bytes). No additional missing indirect target or diagnostic timeout is reported. The [next collection](disc-ranges.md) includes the stage archive and its unobserved English stage-talk companion as two ranges totaling 931,840 bytes. These resources are not supplied yet; stage graphics, sound and gameplay remain unverified.
+
 ## PAL native memory layout
 
 The default runtime reserves the top 1 MiB of EE RAM for helpers. MAIN's original allocator then fails a 0x3c3500-byte graphics allocation. Its subsequent cleanup reads an invalid slot and loops. Returning the original PAL heap boundary, 0x1fe0000 below the 128 KiB main stack, makes that allocation succeed and reaches the original PAL display-mode setup call.

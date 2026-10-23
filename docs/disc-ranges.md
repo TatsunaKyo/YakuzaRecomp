@@ -144,7 +144,17 @@ Bundle 31 supplies all 16 caption files, and all 34 previous excerpt records rem
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x8f032000:0x6e1000 --output .\yakuza-boot-data-32.zip
 ```
 
-Only the first caption movie is an observed request. The other six are included as related companions. These movie bytes are not supplied yet; they differ from the complete caption metadata in bundle 31 and the three already supplied movies.
+Bundle 32 supplies all seven complete caption movies. Its 7,213,056 original bytes pass range integrity and index-bound checks, and all 35 previous excerpt records remain unchanged. Each supplied movie also passes an independent full video decode: 512×288 MPEG-2 at 30000/1001 fps, about eight to eleven seconds long. Only `CAPTION01.SFD` is an observed native request; independent decoding does not establish native playback or audio. These movies differ from the complete caption metadata in bundle 31 and the three earlier supplied movies.
+
+The next clean native run renders the animated date from `CAPTION01.SFD`, finishes it without skip input and requests `/MEDIA3/ARC/ST_DOJIMA1.ARC`. All 1,021,952 caption-movie bytes match EE RAM. No new indirect target or diagnostic timeout is reported. The stage archive is 922,616 bytes, requested as `OGRE3.CVM:0x27952800:0xe1800` (923,648 bytes with sector padding).
+
+The next collection includes that archive and its directly related English stage-talk companion, `/MEDIA/STGTALK/BRI/ST_DOJIMA1.BIN`. The companion has not been requested by execution yet. Both ranges total 931,840 bytes (910 KiB):
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE3.CVM:0x27952800:0xe1800 --range OGRE.CVM:0x156df800:0x2000 --output .\yakuza-boot-data-33.zip
+```
+
+These two Dojima resources are not supplied yet. Stage loading, native sound and gameplay remain unverified.
 
 ## Import and run internally
 
