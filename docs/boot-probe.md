@@ -92,6 +92,12 @@ After `MSSN1010.DAT` loads, the original CRI frame loop at `0x00200c38` resumes 
 
 Chapter 1 playback investigation also exposed a wakeup acknowledgement mismatch. The original notification helper at `0x00200cc0` clears its pending flag only when `WakeupThread` returns the target ID. The pinned wrapper returned zero on success, leaving that flag set. The adapted ordinary and interrupt-safe wakeup wrappers return the target ID after successful scheduler completion and preserve errors. The regression fails before this correction and checks the return value, queued wakeups, the interrupt-safe numeric form and invalid thread IDs afterward. This corrects the observed ABI mismatch; native movie completion requires a separate original-game run.
 
+## IOP sound DMA and critical sections
+
+The pinned IOP emulator delivered scheduled sound-DMA interrupts while the CPU's global interrupt control was disabled. A synthetic module reproduces this by starting DMA inside a critical section and recording whether its callback runs before interrupts are restored. The original emulator fails that check.
+
+[prepare_iop.py](../tools/prepare_iop.py) verifies the pinned emulator source and prepares a private copy that retains pending DMA interrupts while global interrupt control is disabled. Delivery resumes after the outer critical section restores interrupts. [The regression](../tests/test_iop_interrupts.cpp) checks both sound-DMA cores, ordinary disable/enable, nested suspend/restore, and exactly one eventual callback. This fixes the demonstrated interrupt rule; it does not establish that all movie stalls or native audio are fixed.
+
 ## VIF image uploads and private graphics diagnostics
 
 The memory-card dialog exposed a VIF1 transfer-boundary bug. Its font texture in GS memory began with eight bytes of VIF commands, followed by the exact original glyph data shifted eight bytes. Its palette was shifted by two 32-bit entries. A GIF IMAGE tag and its pixels can arrive in separate VIF DIRECT commands; the pinned interpreter treated the next VIF command words as pending image bytes.

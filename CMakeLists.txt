@@ -14,6 +14,32 @@ FetchContent_Declare(ps2recomp
 )
 FetchContent_MakeAvailable(ps2recomp)
 
+# Keep the pinned dependency intact; prepare only the emulator implementation.
+find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+set(iop_private "${CMAKE_CURRENT_BINARY_DIR}/iop-private")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_iop.py")
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_iop.py"
+    --iop-dir "${ps2recomp_SOURCE_DIR}/ps2xIOP" --out-dir "${iop_private}"
+    COMMAND_ERROR_IS_FATAL ANY)
+get_target_property(iop_sources ps2_iop SOURCES)
+set(adapted_iop_sources)
+set(iop_adaptation_count 0)
+foreach(iop_source IN LISTS iop_sources)
+    cmake_path(ABSOLUTE_PATH iop_source BASE_DIRECTORY "${ps2recomp_SOURCE_DIR}/ps2xIOP" OUTPUT_VARIABLE absolute_iop_source)
+    if(absolute_iop_source STREQUAL "${ps2recomp_SOURCE_DIR}/ps2xIOP/src/emulator/iop_emulator.cpp")
+        list(APPEND adapted_iop_sources "${iop_private}/iop_emulator.cpp")
+        math(EXPR iop_adaptation_count "${iop_adaptation_count}+1")
+    else()
+        list(APPEND adapted_iop_sources "${absolute_iop_source}")
+    endif()
+endforeach()
+if(NOT iop_adaptation_count EQUAL 1)
+    message(FATAL_ERROR "Pinned IOP emulator target source no longer matches")
+endif()
+set_property(TARGET ps2_iop PROPERTY SOURCES "${adapted_iop_sources}")
+target_include_directories(ps2_iop PRIVATE "${ps2recomp_SOURCE_DIR}/ps2xIOP/src/emulator")
+
 add_library(yakuza_overlay src/overlay_slot.cpp)
 target_compile_features(yakuza_overlay PUBLIC cxx_std_20)
 target_include_directories(yakuza_overlay PUBLIC include)
@@ -76,6 +102,9 @@ if(WIN32)
 endif()
 
 if(BUILD_TESTING)
+    add_executable(iop_interrupt_tests tests/test_iop_interrupts.cpp)
+    target_link_libraries(iop_interrupt_tests PRIVATE ps2x::iop)
+    add_test(NAME iop_interrupts COMMAND iop_interrupt_tests)
     add_executable(overlay_slot_tests tests/test_overlay_slot.cpp)
     target_link_libraries(overlay_slot_tests PRIVATE yakuza_overlay)
     add_test(NAME overlay_slot COMMAND overlay_slot_tests)
