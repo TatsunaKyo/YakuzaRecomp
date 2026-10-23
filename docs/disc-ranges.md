@@ -86,7 +86,15 @@ The next native run passes `CSE_TITLE.DAT` and requests `/MEDIA2/BGM/TITLE.ADX` 
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE2.CVM:0x4b654800:0x25e800 --output .\yakuza-boot-data-23.zip
 ```
 
-Upload that ZIP privately. Only the main title-track request has been observed; the two other tracks are grouped to reduce separate uploads. Title rendering and audio playback remain unverified.
+Bundle 23 supplies all three tracks. Independent complete ADX decodes pass, and the native run completes the first 51,200-byte `TITLE.ADX` read with an exact match in EE RAM. This does not establish native audio playback or complete streaming. Only the main track request has been observed.
+
+The next missing read is `/MEDIA/TALK/TITLE/TALK_TITLE.BIN`, a 5,024-byte file at `OGRE.CVM:0x216e8800`, read as 6,144 bytes with padding. The next collection includes its adjacent `TALK_CHAPTITLE.BIN` companion: both complete indexed files fit one 26,624-byte range (26 KiB):
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x216e3800:0x6800 --output .\yakuza-boot-data-24.zip
+```
+
+Upload that ZIP privately. The chapter-title file is included to reduce a separate upload and has not been requested by execution yet. Title rendering and native audio playback remain unverified.
 
 ## Import and run internally
 
