@@ -49,6 +49,21 @@ def main():
         b"                    if (cpu.pendingLoadReg != 0u)\n"
         b"                        cpu.gpr[cpu.pendingLoadReg] = cpu.pendingLoadValue;\n"
         b"                    cpu.pendingLoad = false;\n                }\n")
+    rpc = b"    RpcResult IopEmulator::handleRpc(const RpcRequest &request)\n    {\n"
+    if data.count(rpc) != 1 or data.count(b"#include <algorithm>") != 1:
+        parser.error("Pinned IOP RPC entry no longer matches")
+    adapted = adapted.replace(b"#include <algorithm>", b"#include <algorithm>\n#include <stdexcept>")
+    adapted = adapted.replace(rpc, rpc +
+        b"        if (m_impl->rpc.hasServer(request.sid))\n        {\n"
+        b"            const uint64_t start = m_impl->totalInstructions;\n"
+        b"            while (m_impl->memory.interruptControl() == 0u)\n            {\n"
+        b"                if (m_impl->activeCpu || m_impl->totalInstructions - start >= kMaxCallInstructions)\n"
+        b"                    throw std::runtime_error(\"IOP RPC cannot resume the masked guest critical section\");\n"
+        b"                const uint64_t before = m_impl->totalInstructions;\n"
+        b"                m_impl->runCycles(1u);\n"
+        b"                if (m_impl->totalInstructions == before)\n"
+        b"                    throw std::runtime_error(\"IOP RPC is blocked by a guest critical section without a runnable thread\");\n"
+        b"            }\n        }\n")
     kernel = (source_dir / "src/emulator/core/iop_kernel.cpp").read_bytes().replace(b"\r\n", b"\n")
     if hashlib.sha256(kernel).hexdigest() != KERNEL_SHA256:
         parser.error("Unsupported IOP scheduler source; reassess the pinned adaptation")
@@ -72,7 +87,7 @@ def main():
             target.write_bytes(content)
     report = {"source_sha256": SOURCE_SHA256, "adapted_sha256": hashlib.sha256(adapted).hexdigest(),
               "kernel_sha256": KERNEL_SHA256, "adapted_kernel_sha256": hashlib.sha256(kernel).hexdigest(),
-              "policy": "Defer masked DMA, timer and disc callbacks; preserve IOP critical sections and import loads"}
+              "policy": "Preserve IOP critical sections across host slices, callbacks and RPC; consume import loads"}
     (output / "adaptation.json").write_text(json.dumps(report, indent=2) + "\n")
     print("Prepared private IOP interrupt and critical-section adaptations")
 

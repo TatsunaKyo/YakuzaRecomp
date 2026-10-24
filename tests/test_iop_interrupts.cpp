@@ -235,6 +235,86 @@ void checkMaskedTimer(bool nested, bool delayedArgument=false, bool disc=false) 
     std::cout<<(disc?"Disc completion":"Timer interrupt")<<" respects "<<(nested?"nested":"ordinary")
              <<" interrupt masking; delay-slot argument="<<delayedArgument<<'\n';
 }
+
+constexpr uint32_t criticalRpcSid=0xF00D0325u, criticalRpcData=base+0x700;
+std::vector<uint8_t> rpcCriticalModule(bool resumable) {
+    constexpr uint32_t worker=base+0x200, rpc=base+0x300;
+    constexpr uint32_t intr=base+0x400, threads=base+0x500, sif=base+0x600;
+    constexpr uint32_t descriptor=base+0x740, server=base+0x780, buffer=base+0x7c0;
+    std::vector<uint8_t> image(0x900);
+    image[0]=0x7f;image[1]='E';image[2]='L';image[3]='F';image[4]=1;image[5]=1;image[6]=1;
+    put16(image,16,2);put16(image,18,8);put32(image,20,1);put32(image,24,base);put32(image,28,52);
+    put16(image,40,52);put16(image,42,32);put16(image,44,1);
+    put32(image,52,1);put32(image,56,0x100);put32(image,60,base);put32(image,64,base);
+    put32(image,68,0x800);put32(image,72,0x800);put32(image,76,7);put32(image,80,4);
+    std::vector<uint32_t> code;
+    const auto emit=[&](uint32_t word){code.push_back(word);};
+    const auto imm=[&](unsigned reg,uint32_t n){emit(0x3c000000u|(reg<<16)|(n>>16));emit(0x34000000u|(reg<<21)|(reg<<16)|(n&0xffff));};
+    const auto call=[&](uint32_t table,unsigned index){emit(0x0c000000u|((table+20+index*8)>>2));emit(0);};
+    const auto write=[&](uint32_t address) {
+        check(code.size()*4<0x100,"Synthetic RPC routine overlaps the next section");
+        for(size_t i=0;i<code.size();++i)put32(image,0x100+address-base+i*4,code[i]);
+        code.clear();
+    };
+    emit(0x27bdffe0);emit(0xafbf001c);
+    imm(4,server);imm(5,criticalRpcSid);imm(6,rpc);imm(7,buffer);
+    emit(0xafa00010);emit(0xafa00014);emit(0xafa00018);call(sif,0);
+    if(resumable) {
+    imm(8,descriptor);imm(9,worker);emit(0xad090008);
+    imm(9,0x1000);emit(0xad09000c);imm(9,30);emit(0xad090010);
+    imm(4,descriptor);call(threads,0);emit(0x00402021);imm(5,0);call(threads,1);
+    } else {
+        imm(8,criticalRpcData);imm(9,1);emit(0xad090000);call(intr,0);
+    }
+    emit(0x8fbf001c);emit(0x27bd0020);emit(0x03e00008);emit(0x00001021);write(base);
+    emit(0x27bdfff0);emit(0xafbf000c);call(intr,0); // Begin a real guest-thread critical section.
+    imm(8,criticalRpcData);imm(9,1);emit(0xad090000);
+    emit(0x240a0400);emit(0x254affff);emit(0x1540fffe);emit(0); // More than one host slice.
+    emit(0xad000000);call(intr,1);
+    emit(0x8fbf000c);emit(0x27bd0010);emit(0x03e00008);emit(0);write(worker);
+    imm(8,criticalRpcData);emit(0x8d090000);emit(0);emit(0xad090004);
+    emit(0x01001021);emit(0x03e00008);emit(0);write(rpc);
+    const auto table=[&](uint32_t address,const char* name,const std::vector<unsigned>& ordinals) {
+        const size_t offset=0x100+address-base;put32(image,offset,0x41e00000);put32(image,offset+8,0x00000101);
+        std::memcpy(image.data()+offset+12,name,7);
+        for(size_t i=0;i<ordinals.size();++i){put32(image,offset+20+i*8,0x03e00008);put32(image,offset+24+i*8,0x24000000|ordinals[i]);}
+    };
+    table(intr,"intrman",{8,9});table(threads,"thbase",{4,6});table(sif,"sifcmd",{17});
+    return image;
+}
+
+void checkRpcCriticalSection(bool resumable) {
+    Host host;IopSubsystem iop(host);const auto image=rpcCriticalModule(resumable);
+    check(host.writeGuest(0x100,image.data(),image.size()),"Cannot write synthetic critical-section RPC module");
+    auto loaded=iop.loadModuleBuffer(0x100);
+    check(loaded.handled&&loaded.startResult==0,"Critical-section RPC module did not return normally");
+    check(iop.canBindRpc(criticalRpcSid),"Synthetic RPC server was not registered");
+    iop.runEeCycles(800); // Leave the worker inside its masked section at the host boundary.
+    uint32_t active=0;check(iop.readMemory(criticalRpcData,&active,sizeof(active)),"Cannot inspect synthetic critical section");
+    check(active==1,"Synthetic RPC precondition did not reach the critical section");
+    RpcRequest request{};request.sid=criticalRpcSid+1;request.receive={0xe00,8};
+    const auto instructions=iop.debugSnapshot().emulatorInstructions;
+    check(!iop.handleRpc(request).handled,"Unknown RPC server unexpectedly handled");
+    check(iop.debugSnapshot().emulatorInstructions==instructions,"Unknown RPC request advanced the guest critical section");
+    request.sid=criticalRpcSid;
+    if(!resumable) {
+        bool rejected=false;
+        try { (void)iop.handleRpc(request); }
+        catch(const std::runtime_error& error) {
+            rejected=std::string(error.what()).find("critical section")!=std::string::npos;
+        }
+        check(rejected,"RPC entered a masked context without a resumable guest thread");
+        std::array<uint32_t,2> untouched{};
+        check(iop.readMemory(criticalRpcData,untouched.data(),sizeof(untouched)),"Cannot inspect blocked RPC state");
+        check(untouched[0]==1&&untouched[1]==0,"Blocked RPC altered the synthetic critical section");
+        std::cout<<"Unresumable masked RPC fails with a diagnostic and preserves guest data\n";
+        return;
+    }
+    check(iop.handleRpc(request).handled,"Synthetic critical-section RPC was not dispatched");
+    std::array<uint32_t,2> observed{};check(host.readGuest(0xe00,observed.data(),sizeof(observed)),"Cannot read synthetic RPC observation");
+    check(observed[1]==0,"IOP RPC handler preempted a masked guest thread");
+    std::cout<<"Known RPC handler waits for the guest critical section; unknown requests leave it alone\n";
+}
 }
 
 int main() {
@@ -256,5 +336,7 @@ int main() {
     checkMaskedTimer(true,true);
     checkMaskedTimer(false,false,true);
     checkMaskedTimer(true,false,true);
+    checkRpcCriticalSection(true);
+    checkRpcCriticalSection(false);
     std::cout<<"Both sound DMA cores defer masked interrupts and deliver once after outer restore\n";
 }
