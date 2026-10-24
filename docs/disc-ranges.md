@@ -166,7 +166,15 @@ Bundle 34 groups all four shared files directly under `/MEDIA3/ENEMY/`: `ENECOMM
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE3.CVM:0x3b236800:0x7c000 --output .\yakuza-boot-data-34.zip
 ```
 
-Bundle 34 is supplied, verified and imported. All four files are complete against the supported original index, and all 38 previous excerpt records remain unchanged. There are now 39 records covering 685 complete indexed data/audio files and ten complete movies. The range starts after the supplied Dojima archive and does not overlap either earlier OGRE3 excerpt. A further native run is checking execution beyond the former missing read; import verification alone does not establish that these files have executed. The successful run includes private error diagnostics that did not trigger. Another run encountered an original CRI invalid-handle error, which remains under investigation. Stage rendering, native audio, gameplay and original-game execution on Windows remain unverified.
+Bundle 34 is supplied, verified and imported. All four files are complete against the supported original index, and all 38 previous excerpt records remain unchanged. There are now 39 records covering 685 complete indexed data/audio files and ten complete movies. The range starts after the supplied Dojima archive and does not overlap either earlier OGRE3 excerpt. A further clean native run passes the former missing read and retains all 201,968 original bytes of `ENECOMMON.DAT` in game memory. It finishes the Chapter 1 movie and caption without skip input, retains the complete Dojima stage archive and reports no new missing callback or CRI error. `ENECOMMON.BIN` and `ENECOMMONADV.BIN` are byte-identical, so memory equality alone cannot distinguish those files; a whole-file match is established for the distinct `.DAT` file. The other companions have not all been observed executing. Earlier runs encountered an original CRI invalid-handle error, which remains under investigation. Stage rendering, native audio, gameplay and original-game execution on Windows remain unverified.
+
+The next missing file is `/MEDIA/EFFECT/EFFECT_1ST.DAT`: 14,112 original bytes, requested as `OGRE.CVM:0x1aa5800:0x3800` (14,336 bytes with sector padding). Bundle 35 groups all eight files directly under `/MEDIA/EFFECT/` in one contiguous 1,624,064-byte range (about 1.55 MiB), ending at `0x1bc9000`:
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x1a3c800:0x18c800 --output .\yakuza-boot-data-35.zip
+```
+
+This includes `EFCPRI.DAT`, `EFC_KAB.DAT`, `EFFECT_1ST.DAT`, `EFFECT_E3.DAT`, `EFFECT_GMTG.DAT`, `EFFECT_TEST.DAT`, `ENVIRONMENT.DAT` and `PARTICLEDATABASE.DAT`. Only `EFFECT_1ST.DAT` is the observed request; companions are grouped to reduce separate uploads. Original-index bounds and collector limits are checked, and the range does not overlap existing excerpts. Bundle 35 has not been supplied yet. The run ended at this real data hole without a diagnostic timeout; no native capture remains active.
 
 ## Import and run internally
 
