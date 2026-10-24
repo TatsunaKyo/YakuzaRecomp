@@ -176,7 +176,20 @@ void dump_graphics(PS2Runtime& runtime, const std::filesystem::path& folder) {
     std::ofstream iop(folder / "iop-ram.bin", std::ios::binary);
     iop.write(reinterpret_cast<const char*>(iop_memory.data()), iop_memory.size());
     if (!iop) throw std::runtime_error("Cannot write private IOP source memory");
-    std::cout << "[yakuza-gs] saved private graphics trace, VRAM, EE and IOP source memory in state/graphics\n";
+    std::ofstream vu_code(folder / "vu1-code.bin", std::ios::binary);
+    vu_code.write(reinterpret_cast<const char*>(runtime.memory().getVU1Code()), PS2_VU1_CODE_SIZE);
+    std::ofstream vu_data(folder / "vu1-data.bin", std::ios::binary);
+    vu_data.write(reinterpret_cast<const char*>(runtime.memory().getVU1Data()), PS2_VU1_DATA_SIZE);
+    const auto& vif = runtime.memory().vif1_regs;
+    std::ofstream vif_trace(folder / "vif1-state.txt");
+    vif_trace << "code_generation=" << runtime.memory().getVU1CodeGeneration()
+              << std::hex << " code=" << vif.code << " num=" << vif.num
+              << " stat=" << vif.stat << " cycle=" << vif.cycle
+              << " top=" << vif.top << " tops=" << vif.tops
+              << " itop=" << vif.itop << " itops=" << vif.itops
+              << " base=" << vif.base << " offset=" << vif.ofst << '\n';
+    if (!vu_code || !vu_data || !vif_trace) throw std::runtime_error("Cannot write private VU1 state");
+    std::cout << "[yakuza-gs] saved private graphics trace, VRAM, EE, IOP and VU1 memory in state/graphics\n";
 }
 void verify_input(const std::filesystem::path& path, uint64_t length, uint64_t expected) {
     if (std::filesystem::file_size(path) != length) throw std::runtime_error("Unsupported PAL input size");

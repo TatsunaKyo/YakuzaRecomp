@@ -1,4 +1,4 @@
-"""Adapt the hash-checked runtime's VIF1 DIRECT / GIF IMAGE boundaries."""
+"""Preserve VIF1 command and DIRECT / GIF IMAGE boundaries across deliveries."""
 from prepare_game import require
 
 
@@ -7,17 +7,39 @@ def adapt_vif(vif, memory, header):
     require(header.count(anchor) == 1, "VIF state layout no longer matches")
     header = header.replace(anchor, anchor + """    uint32_t m_vif1DirectBytesRemaining = 0u;
     std::vector<uint8_t> m_vif1DirectBuffer;
+    std::vector<uint8_t> m_vif1PendingCommandBytes;
+    bool m_vif1PendingCommandDecoded = false;
 """)
     for indent in ("    ", "                "):
         reset = indent + "m_vif1PendingPath2ImageQwc = 0u;\n"
         require(memory.count("\n" + reset) == 1, "VIF reset site no longer matches")
         memory = memory.replace("\n" + reset, "\n" + reset + indent +
-            "m_vif1DirectBytesRemaining = 0u;\n" + indent + "m_vif1DirectBuffer.clear();\n")
+            "m_vif1DirectBytesRemaining = 0u;\n" + indent + "m_vif1DirectBuffer.clear();\n" + indent +
+            "m_vif1PendingCommandBytes.clear();\n" + indent + "m_vif1PendingCommandDecoded = false;\n")
 
     start = vif.index("void PS2Memory::processVIF1Data(const uint8_t *data, uint32_t sizeBytes)")
     loop = vif.index("    while (pos + 4 <= sizeBytes)", start)
     command = vif.index("        uint32_t cmd;", loop)
-    vif = vif[:loop] + """    // DIRECT owns only its declared payload. A pending GIF IMAGE never
+    vif = vif[:loop] + """    // A DMA/FIFO delivery can end inside a command word or its payload.
+    // Keep the original bytes until that command can be consumed in full.
+    std::vector<uint8_t> resumedBytes;
+    const bool resumedCommandDecoded = m_vif1PendingCommandDecoded;
+    if (!m_vif1PendingCommandBytes.empty())
+    {
+        resumedBytes = m_vif1PendingCommandBytes;
+        resumedBytes.insert(resumedBytes.end(), data, data + sizeBytes);
+        m_vif1PendingCommandBytes.clear();
+        m_vif1PendingCommandDecoded = false;
+        data = resumedBytes.data();
+        sizeBytes = static_cast<uint32_t>(resumedBytes.size());
+    }
+    const auto retainCommand = [&](uint32_t start, bool decoded)
+    {
+        m_vif1PendingCommandBytes.assign(data + start, data + sizeBytes);
+        m_vif1PendingCommandDecoded = decoded;
+    };
+
+    // DIRECT owns only its declared payload. A pending GIF IMAGE never
     // turns subsequent VIF codes into pixels. Buffer a DIRECT split across
     // DMA/FIFO deliveries so neither partial qwords nor GIF tags are lost.
     while (pos < sizeBytes)
@@ -59,7 +81,11 @@ def adapt_vif(vif, memory, header):
             continue;
         }
         if (pos + 4u > sizeBytes)
+        {
+            retainCommand(pos, false);
             break;
+        }
+        const uint32_t commandStart = pos;
 
 """ + vif[command:]
     direct = vif.index("        else if (opcode == VIF_DIRECT || opcode == VIF_DIRECTHL)", loop)
@@ -72,4 +98,43 @@ def adapt_vif(vif, memory, header):
             continue;
         }
 """ + vif[unpack:]
+    # Restrict substitutions to VIF1; VIF0 has its own parser and state.
+    prefix, body = vif[:start], vif[start:]
+    old = """        vif1_regs.code = cmd;
+        vif1_regs.num = num;
+        if (irq)
+            vif1_regs.stat |= (1u << 11); // INT
+"""
+    require(body.count(old) == 1, "VIF1 command registers no longer match")
+    body = body.replace(old, """        // An acknowledged IRQ must not be reasserted when only the
+        // payload resumes: that command header was already decoded.
+        if (!(resumedCommandDecoded && commandStart == 0u))
+        {
+            vif1_regs.code = cmd;
+            vif1_regs.num = num;
+            if (irq)
+                vif1_regs.stat |= (1u << 11); // INT
+        }
+""")
+    for count, expected in ((4, 1), (16, 2)):
+        old = f"            if (pos + {count} > sizeBytes)\n                break;\n"
+        require(body.count(old) == expected, "VIF1 register payload guards no longer match")
+        body = body.replace(old, f"""            if (pos + {count} > sizeBytes)
+            {{
+                retainCommand(commandStart, true);
+                break;
+            }}
+""")
+    for anchor, length in (
+        ("            const uint32_t mpgBytes = instructionCount * 8u;\n", "mpgBytes"),
+        ("            totalBytes = (totalBytes + 3) & ~3u;\n", "totalBytes"),
+    ):
+        require(body.count(anchor) == 1, "VIF1 upload payload layout no longer matches")
+        body = body.replace(anchor, anchor + f"""            if ({length} > sizeBytes - pos)
+            {{
+                retainCommand(commandStart, true);
+                break;
+            }}
+""")
+    vif = prefix + body
     return vif, memory, header

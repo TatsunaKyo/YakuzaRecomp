@@ -32,6 +32,8 @@ Current evidence:
 
 ## Download the Windows diagnostic
 
+The first packaged diagnostic passed Windows/MSVC CI and is available in [run 40123110535](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/40123110535) under **Artifacts → windows-iop-diagnostic-x64**. This run checks the packaged executable and its system DLL imports. Original PAL driver execution on the player’s PC remains pending.
+
 Successful Windows jobs in the [Development tools workflow](https://github.com/TatsunaKyo/YakuzaRecomp/actions/workflows/checks.yml) publish `windows-iop-diagnostic-x64`. Open a completed run and download that artifact. The ZIP contains a Release console diagnostic, instructions, licenses and a `build-info.json` with the exact source commit and executable checksum. The package uses the static MSVC runtime and needs no compiler, Python, Linux or WSL to run.
 
 Supply your own extracted `IRX.DAT` when testing. The package contains no original assets or translated game code. Its result checks Windows driver startup; full original-game Windows execution remains pending.
