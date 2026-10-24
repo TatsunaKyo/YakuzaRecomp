@@ -110,6 +110,10 @@ Scheduled disc-completion callbacks used another unguarded path. A synthetic mod
 
 Direct RPC dispatch could also enter a guest handler between host execution slices while an IOP thread held a masked critical section. A synthetic module registers a handler and pauses its worker inside such a section; the original bridge invokes the handler before the worker leaves it. The private bridge now resumes the retained thread one instruction at a time until it restores interrupts, then enters the handler. Unknown RPC requests retain their previous path. An unresumable section produces a diagnostic; the bridge does not change interrupt flags or invent a successful return. Resumption uses the existing guest-call instruction limit and rejects re-entry into an active masked CPU context.
 
+## EE thread vector constants
+
+The primary runtime initializes VF0 to the hardware constant `(0,0,0,1)`, but `EeScheduler::startThread` reset new thread contexts through a generic constructor that left VF0.W at zero. The hash-checked private adaptation now initializes that constant after resetting a fresh or restarted thread. It leaves all other initial registers and thread-start behavior unchanged. The display-free thread test checks both starts and restarts, in addition to the existing resume/wakeup ABI checks, and fails against the previous initialization. Both original-code hosts build and the selected native runtime checks pass. The effect on original scene rendering remains under test.
+
 ## VIF image uploads and private graphics diagnostics
 
 The memory-card dialog exposed a VIF1 transfer-boundary bug. Its font texture in GS memory began with eight bytes of VIF commands, followed by the exact original glyph data shifted eight bytes. Its palette was shifted by two 32-bit entries. A GIF IMAGE tag and its pixels can arrive in separate VIF DIRECT commands; the pinned interpreter treated the next VIF command words as pending image bytes.

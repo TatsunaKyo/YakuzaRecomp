@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Synthetic EE resume/wakeup ABI regression; no original assets or display.
+// Synthetic EE thread startup and resume/wakeup regression; no original assets or display.
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 #include "ps2_syscalls.h"
@@ -13,11 +13,16 @@ int main() {
     check(runtime.memory().initialize(), "Memory initialization failed");
     auto* memory = runtime.memory().getRDRAM();
     R5900Context context{};
+    context.vu0_vf[0] = _mm_set_ps(1.f, 0.f, 0.f, 0.f);
     context.pc = 0x100008;
     auto& ee = runtime.eeScheduler();
     ee.bindMainContextForSyscall(context, memory);
     const int id = ee.createThread(EeThreadCreateParams{0, 0x100100, 0x20000, 0x1000, 0, 26, 0});
     check(id > 1 && ee.startThread(id, 0, context, false) == 0, "Worker did not start");
+    alignas(16) float vf0[4];
+    _mm_store_ps(vf0, ee.thread(id)->context.vu0_vf[0]);
+    check(vf0[0] == 0.f && vf0[1] == 0.f && vf0[2] == 0.f && vf0[3] == 1.f,
+          "Started EE thread lost the hardware VF0 constant (0,0,0,1)");
     check(ee.suspendThread(id, false) == 0, "Worker did not suspend");
     SET_GPR_S32((&context), 4, id);
     ps2_syscalls::ResumeThread(memory, &context, &runtime);
@@ -51,5 +56,11 @@ int main() {
     SET_GPR_S32((&context), 4, 0x7fff);
     ps2_syscalls::ResumeThread(memory, &context, &runtime);
     check(GPR_S32((&context), 2) == -407, "Unknown-thread resume lost its real error");
+    uint32_t owned_stack = 0;
+    check(ee.terminateThread(id, owned_stack, false) == 0, "Worker did not terminate for restart");
+    check(ee.startThread(id, 0, context, false) == 0, "Worker did not restart");
+    _mm_store_ps(vf0, ee.thread(id)->context.vu0_vf[0]);
+    check(vf0[0] == 0.f && vf0[1] == 0.f && vf0[2] == 0.f && vf0[3] == 1.f,
+          "Restarted EE thread lost the hardware VF0 constant (0,0,0,1)");
     std::cout << "Resume and wakeup return the real thread ID and preserve notifications and errors\n";
 }

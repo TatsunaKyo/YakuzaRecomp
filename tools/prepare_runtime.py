@@ -19,6 +19,7 @@ HASHES = {
     "Kernel/Syscalls/Helpers/State.h": "88a8a4b4991b87fe052a4d3555facbb355207dd8572eaa1ff978c1fc712bf6c4",
     "ps2_runtime.cpp": "77cd184f2e70eacfd5ea584ec95829553e3deeead0a19c04e4b0970dd7c6c9ee",
     "Kernel/Syscalls/Thread.cpp": "e73d7f0a46d07fc0f70d5b49b6453ed64271b3ad19ffd62a6a872095491bcdf4",
+    "Kernel/EeScheduler.cpp": "89383df078a13e9d13335f158ce88f0fb85935c57f2edab0ef8f4a0c9edb4b83",
     "ps2_vif1_interpreter.cpp": "4090662ca7029c6563444e69ac184cf1396efdf672d179dd8e9d617fe856c4a5",
     "ps2_memory.cpp": "4bae084dfa6ea30479af5efde70c61927a4fe5a49216d99c3db76297db4ac22a",
 }
@@ -111,6 +112,13 @@ def main():
             setReturnS32(ctx, result == 0 ? id : result);
 """)
     texts["Kernel/Syscalls/Thread.cpp"] = thread
+    scheduler = texts["Kernel/EeScheduler.cpp"]
+    scheduler = replace(scheduler, "    target->context = R5900Context{};\n", """    target->context = R5900Context{};
+    // VF0 is the hardware constant (0,0,0,1), including on a fresh or
+    // restarted thread. The generic context constructor zeroes its W lane.
+    target->context.vu0_vf[0] = _mm_set_ps(1.0f, 0.0f, 0.0f, 0.0f);
+""")
+    texts["Kernel/EeScheduler.cpp"] = scheduler
     include = args.runtime_dir.resolve() / "include"
     memory_header = (include / "runtime/ps2_memory.h").read_bytes().replace(b"\r\n", b"\n")
     require(hashlib.sha256(memory_header).hexdigest() == MEMORY_HEADER_SHA256,
