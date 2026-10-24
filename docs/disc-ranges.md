@@ -182,7 +182,7 @@ The next missing file is `/MEDIA/ADVMISC/ADVMISC00.DAT`, the only file in its di
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x981800:0x2800 --output .\yakuza-boot-data-36.zip
 ```
 
-The original index and collector limits are checked, and this range does not overlap any supplied excerpt. Bundle 36 has not been supplied yet. The run ended at this missing-data read without a diagnostic timeout. A separate correction to the runtime's MMI lane permutations is undergoing host rebuilds and a native recheck.
+The original index and collector limits are checked, and this range does not overlap any supplied excerpt. Bundle 36 has not been supplied yet. The run ended at this missing-data read without a diagnostic timeout. Both hosts rebuild with a separate correction to the runtime's MMI lane permutations, and all selected regressions pass. The corrected clean native run finishes the movie and caption without extra skip input, again retains the complete `ENVIRONMENT.DAT` and Dojima archive, and stops naturally on the same `ADVMISC00.DAT` read. It reports no new missing callback or CRI error. Selected opening footage no longer has the earlier yellow cast; complete accurate presentation and the Chapter 1 bottom strip remain unresolved. No native capture remains active.
 
 ## Import and run internally
 
