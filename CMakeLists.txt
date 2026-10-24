@@ -106,6 +106,24 @@ if(WIN32)
 endif()
 
 if(BUILD_TESTING)
+    set(mmi_private "${CMAKE_CURRENT_BINARY_DIR}/mmi-private")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_mmi.py")
+    execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_mmi.py"
+        --macros-header "${ps2recomp_SOURCE_DIR}/ps2xRuntime/include/ps2_runtime_macros.h"
+        --out-file "${mmi_private}/ps2_runtime_macros.h"
+        COMMAND_ERROR_IS_FATAL ANY)
+    add_executable(mmi_permutation_tests tests/test_mmi_permutations.cpp)
+    target_compile_features(mmi_permutation_tests PRIVATE cxx_std_20)
+    target_include_directories(mmi_permutation_tests PRIVATE "${mmi_private}"
+        "${ps2recomp_SOURCE_DIR}/ps2xRuntime/include" "${ps2recomp_SOURCE_DIR}/ps2xIOP/include")
+    if(WIN32)
+        target_compile_definitions(mmi_permutation_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    endif()
+    if(NOT MSVC)
+        target_compile_options(mmi_permutation_tests PRIVATE -msse4.1)
+    endif()
+    add_test(NAME mmi_permutations COMMAND mmi_permutation_tests)
     add_executable(iop_interrupt_tests tests/test_iop_interrupts.cpp)
     target_link_libraries(iop_interrupt_tests PRIVATE ps2x::iop)
     target_include_directories(iop_interrupt_tests PRIVATE "${ps2recomp_SOURCE_DIR}/ps2xIOP/src/emulator")

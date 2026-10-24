@@ -13,6 +13,7 @@ from prepare_game import require
 from prepare_vif import adapt_vif
 from prepare_ipu import adapt_ipu, adapt_ipu_faults
 from prepare_spr import adapt_spr
+from prepare_mmi import adapt_mmi, MACROS_SHA256
 
 HASHES = {
     "Kernel/Syscalls/Helpers/State.h": "88a8a4b4991b87fe052a4d3555facbb355207dd8572eaa1ff978c1fc712bf6c4",
@@ -124,6 +125,8 @@ def main():
         if not path.is_file(): continue
         relative = path.relative_to(include)
         data = memory_header.encode() if relative.as_posix() == "runtime/ps2_memory.h" else path.read_bytes()
+        if relative.as_posix() == "ps2_runtime_macros.h":
+            data = adapt_mmi(data)
         save(output / "include" / relative, data)
     for path in source.rglob("*"):
         require(not path.is_symlink(), "Unexpected symlink in pinned runtime source")
@@ -138,7 +141,8 @@ def main():
     header += f"inline constexpr unsigned game_heap_end = 0x{layout['game_heap_end']:x}u;\n}}\n"
     save(output / "pal_runtime_layout.h", header.encode())
     save(output / "adaptation.json", (json.dumps({"source_sha256": HASHES,
-        "memory_header_sha256": MEMORY_HEADER_SHA256, "layout": layout}, indent=2) + "\n").encode())
+        "memory_header_sha256": MEMORY_HEADER_SHA256, "macros_header_sha256": MACROS_SHA256,
+        "layout": layout}, indent=2) + "\n").encode())
     print("Prepared private PAL runtime: heaps, recursive yields, syscall results, VIF and IPU input")
 
 

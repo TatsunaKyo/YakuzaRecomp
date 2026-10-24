@@ -174,7 +174,15 @@ The next missing file is `/MEDIA/EFFECT/EFFECT_1ST.DAT`: 14,112 original bytes, 
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x1a3c800:0x18c800 --output .\yakuza-boot-data-35.zip
 ```
 
-This includes `EFCPRI.DAT`, `EFC_KAB.DAT`, `EFFECT_1ST.DAT`, `EFFECT_E3.DAT`, `EFFECT_GMTG.DAT`, `EFFECT_TEST.DAT`, `ENVIRONMENT.DAT` and `PARTICLEDATABASE.DAT`. Only `EFFECT_1ST.DAT` is the observed request; companions are grouped to reduce separate uploads. Original-index bounds and collector limits are checked, and the range does not overlap existing excerpts. Bundle 35 is supplied, verified and imported. All eight original files are complete, and all 39 previous excerpt records remain unchanged. There are now 40 records covering 693 complete indexed data/audio files and ten complete movies. A clean native run is checking execution beyond the former missing read; import verification alone does not establish execution of the companion files.
+This includes `EFCPRI.DAT`, `EFC_KAB.DAT`, `EFFECT_1ST.DAT`, `EFFECT_E3.DAT`, `EFFECT_GMTG.DAT`, `EFFECT_TEST.DAT`, `ENVIRONMENT.DAT` and `PARTICLEDATABASE.DAT`. Only `EFFECT_1ST.DAT` is the observed request; companions are grouped to reduce separate uploads. Original-index bounds and collector limits are checked, and the range does not overlap existing excerpts. Bundle 35 is supplied, verified and imported. All eight original files are complete, and all 39 previous excerpt records remain unchanged. There are now 40 records covering 693 complete indexed data/audio files and ten complete movies. A clean native run passes the former missing read and retains all 6,480 bytes of `ENVIRONMENT.DAT` in game memory. It also retains the complete Dojima stage archive and reports no new missing callback or CRI error. A whole-file equality check is not established for `EFFECT_1ST.DAT`; the later boundary establishes progress past its read. The other companions have not all been observed executing.
+
+The next missing file is `/MEDIA/ADVMISC/ADVMISC00.DAT`, the only file in its directory: 10,064 original bytes at `OGRE.CVM:0x981800`, requested as a 10,240-byte sector range. Bundle 36 collects that complete file with its original sector padding:
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x981800:0x2800 --output .\yakuza-boot-data-36.zip
+```
+
+The original index and collector limits are checked, and this range does not overlap any supplied excerpt. Bundle 36 has not been supplied yet. The run ended at this missing-data read without a diagnostic timeout. A separate correction to the runtime's MMI lane permutations is undergoing host rebuilds and a native recheck.
 
 ## Import and run internally
 

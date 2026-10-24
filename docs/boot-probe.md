@@ -146,6 +146,14 @@ RGB32 CSC consumes the declared number of Y/Cb/Cr macroblocks and emits RGBA usi
 
 IDEC, RGB16 CSC and PACK commands remain unsupported and stop explicitly. Correct movie reconstruction and on-screen presentation remain unverified; completed DMA transfers alone do not establish correct playback.
 
+## R5900 packed lane permutations
+
+The original sprite emitter at `0x00194120` expands packed BGRA bytes, uses `PEXEW` to exchange red and blue, and optionally rounds and halves the channels. The pinned runtime macro exchanges adjacent words instead, sending the alpha byte into the blue channel. With a synthetic white input, that produces RGBA `[128, 128, 64, 128]`, matching the previously observed movie packets, instead of `[128, 128, 128, 64]`.
+
+[prepare_mmi.py](../tools/prepare_mmi.py) checks the complete pinned macro-header hash before correcting three related lane permutations in a private copy. `PEXEW` exchanges words 0 and 2; `PEXEH` exchanges even halfwords within each 64-bit half; `PROT3W` rotates the low three words while preserving word 3. These agree with the [PCSX2 R5900 interpreter](https://github.com/PCSX2/pcsx2/blob/master/pcsx2/MMI.cpp). Original game instructions and the dependency checkout remain unchanged.
+
+The original-free `mmi_permutations` regression checks distinct values in every lane and two packed sprite colors. It fails on the pinned macros and passes on the corrected header. Default tools test the copied macro header; boot builds test the exact private header used by translated code. Linux and Windows host rebuilds and a further native presentation check are in progress. This does not yet establish correct complete movie colors, the bottom strip or gameplay.
+
 ## Scratchpad source-chain DMA
 
 The original motion-compensation helper at `0x0012ac78` builds REF/REFE tags and starts channel 9 with CHCR `0x105`. The pinned runtime handled normal scratchpad copies, but ignored source chains; polling then cleared STR without transferring their bytes. A synthetic chain reproduces the missing copy before the correction.
@@ -249,7 +257,7 @@ Supplement v57 contains 394 ranges and 6,119 instructions; the complete decoded 
 
 The default runtime reserves the top 1 MiB of EE RAM for helpers. MAIN's original allocator then fails a 0x3c3500-byte graphics allocation. Its subsequent cleanup reads an invalid slot and loops. Returning the original PAL heap boundary, 0x1fe0000 below the 128 KiB main stack, makes that allocation succeed and reaches the original PAL display-mode setup call.
 
-[prepare_runtime.py](../tools/prepare_runtime.py) verifies the exact source digests of five adapted upstream files and the memory header, then creates private build copies. All host translation units use the copied headers so they share the adapted memory layout. The source checkout stays intact. [pal-runtime-layout.json](../config/pal-runtime-layout.json) defines disjoint low-memory regions above the native kernel mirrors and below the resident executable at 0x100000:
+[prepare_runtime.py](../tools/prepare_runtime.py) verifies the exact source digests of five adapted upstream files, the memory header and the MMI macro header, then creates private build copies. All host translation units use the copied headers so they share the adapted memory layout. The source checkout stays intact. [pal-runtime-layout.json](../config/pal-runtime-layout.json) defines disjoint low-memory regions above the native kernel mirrors and below the resident executable at 0x100000:
 
 | Native region | Start | End (exclusive) |
 | --- | --- | --- |

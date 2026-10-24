@@ -18,6 +18,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_vif.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_ipu.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_spr.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_mmi.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/config/pal-runtime-layout.json")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
     --runtime-dir "${ps2recomp_SOURCE_DIR}/ps2xRuntime" --out-dir "${runtime_private}"
@@ -119,6 +120,8 @@ if(WIN32)
     endif()
 endif()
 if(BUILD_TESTING)
+    # Exercise the exact copied header used by translated code in this build.
+    target_include_directories(mmi_permutation_tests BEFORE PRIVATE "${runtime_private}/include")
     add_executable(boot_dispatch_tests tests/test_boot_dispatch.cpp
         tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
     target_link_libraries(boot_dispatch_tests PRIVATE ps2_runtime)
