@@ -46,7 +46,8 @@ def main():
     result["input_sha256"] = PAL_INPUTS.copy()
     # Auxiliary boot data changes execution too. Record the actual supplied
     # bytes without making these files a prerequisite for the MAIN checkpoint.
-    for name in ("IRX.DAT", "IOPRP300.IMG", "PAL_NTSC.DAT"):
+    for name in ("IRX.DAT", "IOPRP300.IMG", "PAL_NTSC.DAT",
+                 "OGRE.CVM", "OGRE2.CVM", "OGRE3.CVM", "OGRE4.CVM"):
         path = args.disc_dir / name
         if path.is_file(): result["input_sha256"][name] = file_sha256(path)
     excerpts = args.disc_dir / ".yakuza-disc-ranges"

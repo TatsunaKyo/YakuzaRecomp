@@ -44,6 +44,8 @@ A [Windows collection tool](docs/disc-ranges.md) remains available for collectin
 
 The supplied `PAL_NTSC.DAT` now loads through the original disc-read path. Native vertical-blank and recursive-dispatch fixes address observed stack corruption. A first-port controller adapter passes host keyboard input into the original PAL selection code; an X key press is observed as Cross. Execution then reaches filesystem and archive initialization. A priority-syscall correction lets the original I/O workers run, and supplemental translation retains previously identified callback entries. A VIF transfer-boundary correction removes control words from image uploads. The captured memory-card dialog is now readable, and its entire 32 KiB font texture and 64-byte palette match their original EE upload sources byte for byte. Other graphics remain unverified.
 
+A native replay with the complete archives finishes the Chapter 1 movie and caption and advances beyond the former enemy-data stop. It next reaches an untranslated packed interpolation callback. The original selector and all eight related wrappers are now fingerprinted and translated; four previously unrecognized callable entries are added while all earlier translations are retained. Altered original code is rejected before classification changes. Execution with the new translations is being validated separately; this is not a playable-stage milestone.
+
 There is no release date yet. Completing translation is one part of the work; runtime behavior and game compatibility still need substantial development.
 
 ## Current evidence
