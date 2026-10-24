@@ -102,10 +102,16 @@ set_source_files_properties("${boot_private}/register_boot_overlays.cpp" PROPERT
 if(YAKUZA_BOOT_SUPPLEMENT_DIR)
     file(GLOB supplement_sources CONFIGURE_DEPENDS "${YAKUZA_BOOT_SUPPLEMENT_DIR}/*.cpp")
     list(REMOVE_ITEM supplement_sources "${YAKUZA_BOOT_SUPPLEMENT_DIR}/register_functions.cpp")
-    target_sources(yakuza_boot_probe PRIVATE ${supplement_sources})
-    set_source_files_properties(${supplement_sources} PROPERTIES
-        SKIP_PRECOMPILE_HEADERS ON SKIP_UNITY_BUILD_INCLUSION ON
-        INCLUDE_DIRECTORIES "${YAKUZA_BOOT_SUPPLEMENT_DIR}")
+    foreach(source IN LISTS supplement_sources)
+        # Verified generated versions may share unchanged source files. Keep
+        # each physical source and its own declarations stable across versions.
+        get_filename_component(canonical_source "${source}" REALPATH)
+        get_filename_component(source_include "${canonical_source}" DIRECTORY)
+        target_sources(yakuza_boot_probe PRIVATE "${canonical_source}")
+        set_source_files_properties("${canonical_source}" PROPERTIES
+            SKIP_PRECOMPILE_HEADERS ON SKIP_UNITY_BUILD_INCLUSION ON
+            INCLUDE_DIRECTORIES "${source_include}")
+    endforeach()
 endif()
 foreach(source IN LISTS boot_generated)
     file(SIZE "${source}" source_size)

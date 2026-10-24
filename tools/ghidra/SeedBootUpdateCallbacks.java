@@ -103,6 +103,11 @@ public class SeedBootUpdateCallbacks extends GhidraScript {
             0x13d900L, 0x13d920L, 0x13d940L, 0x13d960L, 0x13d980L, 0x13d9a0L,
             0x13d9c0L, 0x13d9e0L, 0x13da00L, 0x1421a0L, 0x143580L, 0x1435f0L,
             0x1436f0L, 0x1444a0L, 0x144630L, 0x146a20L);
+        // Stage drawing reaches the third method of this graphics interface.
+        // Verify both header words and all three methods before classification.
+        collectCatalog(5, 0, 1, 3,
+            "1bd8fb786cd87ce00ea46a0158d463b3f60229303db6c35c4bb41a19566295b1", entries,
+            0x13b840L);
         // Validate the entire catalog before changing any analysis metadata.
         for (long target : entries) {
             Address entry = toAddr(target);

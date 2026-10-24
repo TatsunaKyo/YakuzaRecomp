@@ -23,6 +23,8 @@ The generated directories must contain the real verified resident/MAIN `.cpp` fi
 
 Append `continue` after the state folder to execute MAIN's body. A continued run has no success completion condition yet and returns nonzero when stopped. Reaching MAIN and completing a playable boot are separate results.
 
+For incremental research builds, supplemental source links resolve to their physical files and use those files' own declaration headers. A privately prepared new generation can share earlier files after verifying identical C++ bytes, unchanged common header content and stub declarations, and retention of every earlier function declaration. The original instruction map and callable-entry checks still run for the new generation. Generate into a fresh directory before preparing links; do not regenerate into a directory containing linked earlier sources. The first such Linux and Windows builds compile three C++ units: the two new methods and registration, retaining the 402 earlier compiled translations.
+
 The initial Windows cross-build disables FFmpeg video decoding explicitly. This limits media behavior and is not a completed video implementation. The native Linux development build enables system FFmpeg. Full gameplay graphics, audio and controls remain unverified.
 
 ## Internal Linux boot attempt
@@ -260,6 +262,12 @@ With complete original archives mounted, a native replay finishes the Chapter 1 
 [SeedPackedInterpolationCallbacks.java](../tools/ghidra/SeedPackedInterpolationCallbacks.java) fingerprints the complete original selector at `0x00248df0` and its eight packed interpolation wrappers before classifying any entry. All 2,384 bytes match the original analysis image and the native RAM snapshot. Four wrapper starts were previously unrecognized. A private Ghidra regression rejects 27 altered instruction words before classification changes, restores the original bytes and instruction metadata, and verifies that repeating the supported classification adds no functions.
 
 Supplemental generation retains all 394 earlier translation files unchanged and emits eight additional wrapper files. It preserves all 332,094 earlier resident/MAIN callable entries and adds four distinct entries, totaling 332,098. The supplement contains 402 ranges and 6,375 instructions, with zero translation errors, unhandled instructions or critical guest fallbacks; 84 control-flow warnings remain. Both complete original-code hosts compile and link for Linux x86-64 and Windows x64. Generation and successful compilation are separate from proving those routines execute correctly in the game.
+
+## Graphics command interface
+
+A further native replay with the complete archives reaches `0x0018ef80 -> 0x001b3880`, through slot `0x10` of table `0x0013b840`. The complete table contains two zero header words and three method pointers; every byte matches the original image and the native RAM snapshot. The existing callback recovery script now verifies that table alongside the earlier catalogs. All 65 changed-word cases reject before classification changes, and repeating the supported classification adds no functions. The full catalog covers 298 distinct tables and 892 methods.
+
+The previously recognized `0x001b3840` entry is retained; `0x001b3870` and `0x001b3880` are added. Supplemental generation contains 404 ranges and 6,471 instructions, preserves all 332,098 earlier resident/MAIN callable entries and totals 332,100. There are no translation errors, unhandled instructions or critical guest fallbacks; 84 control-flow warnings remain. Both full hosts build. The earlier audio-driver error does not recur in this replay, so its lifecycle trace does not dump; this does not resolve that intermittent fault or prove execution coverage for every new callback. Stage graphics and gameplay remain unverified.
 
 ## PAL native memory layout
 
