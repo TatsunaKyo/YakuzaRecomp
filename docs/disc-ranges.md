@@ -1,6 +1,6 @@
 # Small private archive uploads
 
-The PAL boot trace now searches for OGRE.CVM, OGRE2.CVM and OGRE3.CVM. They contain several gigabytes altogether. During development, the boot probe can instead read small original excerpts from these archives and report exactly which further bytes it needs. This is a development aid; full gameplay still requires the original assets.
+The complete supported PAL disc is now verified in private development storage, including OGRE.CVM, OGRE2.CVM and OGRE3.CVM. Every byte of all 42 earlier excerpt records matches those complete archives, and the prior records are preserved. No further small uploads are needed for this disc. The collection commands and data-boundary history below document the optional excerpt workflow; they are not current upload requests. Full data availability does not establish playable execution.
 
 ## Collect on Windows
 
@@ -190,15 +190,15 @@ The next missing file is `/MEDIA/PARTICLE/PTCL_AUTH.DAT`: 317,248 original bytes
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x422e800:0xda3000 --output .\yakuza-boot-data-37.zip
 ```
 
-This covers all 712 indexed particle files. Only `PTCL_AUTH.DAT` is the observed request; the other files are included to reduce separate uploads and have not all been observed executing. Index bounds, collector limits and absence of overlap with supplied excerpts are checked. Bundle 37 is supplied, verified and imported. All 712 indexed particle files are complete and all 41 prior records remain unchanged, giving 42 records with 1,406 complete indexed data/audio files and ten movies. A further diagnostic run passes the former `PTCL_AUTH.DAT` read and reaches a new missing enemy-data file. A whole-file RAM match is not established for `PTCL_AUTH.DAT`; the later boundary establishes progress. Private driver-error observers do not trigger in that run. No native capture remains active. The intermittent audio-driver error remains under investigation; stage rendering, native audio, gameplay and original-game execution on Windows remain unverified.
+This covers all 712 indexed particle files. Only `PTCL_AUTH.DAT` is the observed request; the other files are included to reduce separate uploads and have not all been observed executing. Index bounds, collector limits and absence of overlap with supplied excerpts are checked. Bundle 37 is supplied, verified and imported. All 712 indexed particle files are complete and all 41 prior records remain unchanged, giving 42 records with 1,406 complete indexed data/audio files and ten movies. A further diagnostic run passes the former `PTCL_AUTH.DAT` read and reaches a new missing enemy-data file. A whole-file RAM match is not established for `PTCL_AUTH.DAT`; the later boundary establishes progress. Private driver-error observers do not trigger in that run. That diagnostic run completed at the missing enemy-data read. The intermittent audio-driver error remains under investigation; stage rendering, native audio, gameplay and original-game execution on Windows remain unverified.
 
-The next missing file is `/MEDIA3/ENEMY/E434/E43400.DAT`: 84,736 original bytes at `OGRE3.CVM:0x45bd8000`, requested as 86,016 sector bytes (`0x15000`). Bundle 38 groups all three adjacent `E43400.DAT`, `E43402.DAT` and `E43404.DAT` variants in one 258,048-byte range (252 KiB):
+The final missing file under excerpt mode was `/MEDIA3/ENEMY/E434/E43400.DAT`: 84,736 original bytes at `OGRE3.CVM:0x45bd8000`, requested as 86,016 sector bytes (`0x15000`). Bundle 38 groups all three adjacent `E43400.DAT`, `E43402.DAT` and `E43404.DAT` variants in one 258,048-byte range (252 KiB):
 
 ```powershell
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE3.CVM:0x45bd8000:0x3f000 --output .\yakuza-boot-data-38.zip
 ```
 
-Only `E43400.DAT` is the observed request. Index bounds, collector limits and absence of overlap with supplied OGRE3 excerpts are checked. Bundle 38 has not been supplied yet. To reduce future small uploads, [bulk transfer](bulk-data.md) can provide the complete original `OGRE3.CVM` through upload-sized compressed volumes; an accessible private full-archive link is another option. A verified complete archive takes priority over existing excerpts and includes this missing group.
+Only `E43400.DAT` was the observed request. Index bounds, collector limits and absence of overlap with supplied OGRE3 excerpts are checked. Bundle 38 was not supplied; instead, [bulk transfer](bulk-data.md) through a private full-disc link supplied the complete original archives. The verified complete OGRE3.CVM includes this group and takes priority over the preserved excerpts. Gzip integrity checks, all 14 root-file checks and comparisons against all 42 prior excerpt records pass. Execution beyond the former boundary is validated separately.
 
 ## Import and run internally
 

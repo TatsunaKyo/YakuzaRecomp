@@ -2,6 +2,8 @@
 
 Complete original archives let development continue through new file requests without another upload for each small asset. They do not solve runtime compatibility issues. Original game data stays in private development storage.
 
+The complete supported PAL disc has now been downloaded and verified privately: its gzip stream passes integrity checks, all 14 root files are checked, and all 42 previously supplied excerpt records match the complete archives. The missing three complete CVMs are restored without changing existing originals or excerpts. Further small uploads are no longer needed for this disc; the collection workflows below remain available for research and other private transfers.
+
 ## Private download link
 
 Upload your own `.iso.gz`, ISO or extracted `OGRE.CVM`, `OGRE2.CVM` and `OGRE3.CVM` to storage you control, then provide a download link through the development session. The chat attachment size limit applies to direct attachments; a link is a separate transfer route. Access and download capability must be checked for the actual link. A sign-in-only link may need a supported storage connector or another authorized download method. Never send account passwords or access tokens.
@@ -12,7 +14,7 @@ This is the most convenient route for a disc image of several gigabytes: one ext
 
 [disc_pack.py](../tools/disc_pack.py) reads an extracted disc folder, ISO or `.iso.gz`, compresses the selected complete archives and splits the compressed ZIP stream into parts of at most **24 MiB**. It scans selected ISO extents in disc order in one session rather than reopening the compressed ISO for every part. It does not require a decompressed ISO copy. Memory use is bounded by small read buffers. ZIP64 supports combined archives and ZIP offsets beyond 4 GiB; the collector is not restricted to a 4 GB ZIP file.
 
-The number of parts depends on compression. A nearly 4 GB compressed disc image would still require many parts if transferred in full. Selecting only `OGRE3.CVM` is a useful starting point for the current enemy/stage-data boundary; its original size is about 1.1 GiB. It includes the presently missing `E434` data and future assets from that archive. Other archives may still be needed later.
+The number of parts depends on compression. A nearly 4 GB compressed disc image would still require many parts if transferred in full. Selecting only `OGRE3.CVM` was a useful starting point for the earlier enemy/stage-data boundary; its original size is about 1.1 GiB. The complete disc now supplies that data and the other archives.
 
 Run this from the folder containing your ISO on Windows 10/11, using the Python installation already used by `disc_ranges.py`:
 
