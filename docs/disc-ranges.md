@@ -154,7 +154,7 @@ The next collection includes that archive and its directly related English stage
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE3.CVM:0x27952800:0xe1800 --range OGRE.CVM:0x156df800:0x2000 --output .\yakuza-boot-data-33.zip
 ```
 
-Bundle 33 supplies both Dojima resources. Their 931,840 payload bytes pass range-integrity and original-index checks, with all 36 earlier records unchanged. There are now 38 excerpt records covering 681 indexed data/audio files and ten complete movies. Stage presentation, native sound and gameplay remain unverified.
+Bundle 33 supplies both Dojima resources. Their 931,840 payload bytes pass range-integrity and original-index checks, with all 36 earlier records unchanged. At that point, 38 excerpt records cover 681 indexed data/audio files and ten complete movies. Stage presentation, native sound and gameplay remain unverified.
 
 A native run loads both files: the entire 922,616-byte stage archive and 7,508-byte English companion match their original bytes in EE RAM. That run exposed an untranslated original method. The related 65-method family has since been recovered.
 
@@ -166,7 +166,7 @@ Bundle 34 groups all four shared files directly under `/MEDIA3/ENEMY/`: `ENECOMM
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE3.CVM:0x3b236800:0x7c000 --output .\yakuza-boot-data-34.zip
 ```
 
-The range starts after the already supplied Dojima archive and does not overlap either existing OGRE3 excerpt. Bundle 34 has not been supplied or imported yet. The successful run includes private error diagnostics that did not trigger. Another run encountered an original CRI invalid-handle error, which remains under investigation. Stage rendering, native audio, gameplay and original-game execution on Windows remain unverified.
+Bundle 34 is supplied, verified and imported. All four files are complete against the supported original index, and all 38 previous excerpt records remain unchanged. There are now 39 records covering 685 complete indexed data/audio files and ten complete movies. The range starts after the supplied Dojima archive and does not overlap either earlier OGRE3 excerpt. A further native run is checking execution beyond the former missing read; import verification alone does not establish that these files have executed. The successful run includes private error diagnostics that did not trigger. Another run encountered an original CRI invalid-handle error, which remains under investigation. Stage rendering, native audio, gameplay and original-game execution on Windows remain unverified.
 
 ## Import and run internally
 
