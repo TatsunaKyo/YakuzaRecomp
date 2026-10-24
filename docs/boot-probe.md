@@ -104,6 +104,8 @@ Hardware timer handlers had a separate unguarded delivery path. A synthetic modu
 
 Import interception also bypassed the thunk instruction that consumes a pending MIPS load. If a caller loads an argument in the call's branch delay slot, the imported function could read its old value. The private emulator commits that pending load before resolving the import, including imports that jump into original guest code. A regression restores nested interrupt flags through delay-slot loads with deliberately opposite old arguments; it fails on the old import path and checks both deferred inner restoration and exactly-once delivery after the outer restoration. This addresses the demonstrated import boundary; its effect on original-game execution is tested separately.
 
+Scheduled disc-completion callbacks used another unguarded path. A synthetic module registers a CD callback and issues a seek, requiring no disc data. The regression reproduces callback delivery while interrupts are disabled and checks ordinary and nested restoration, exactly-once delivery and the original seek-reason argument. The private emulator now retains these scheduled callbacks until global interrupts are restored. This prevents host callback delivery from entering the original driver in the middle of a masked critical section.
+
 ## VIF image uploads and private graphics diagnostics
 
 The memory-card dialog exposed a VIF1 transfer-boundary bug. Its font texture in GS memory began with eight bytes of VIF commands, followed by the exact original glyph data shifted eight bytes. Its palette was shifted by two 32-bit entries. A GIF IMAGE tag and its pixels can arrive in separate VIF DIRECT commands; the pinned interpreter treated the next VIF command words as pending image bytes.

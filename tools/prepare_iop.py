@@ -28,6 +28,11 @@ def main():
            b"            // They become deliverable after the outer critical section restores I_CTRL.\n"
            b"            if (servicingDmaInterrupts || pendingDmaInterrupts.empty() || memory.interruptControl() == 0u)")
     adapted = data.replace(old, new)
+    callback = b"if (servicingGuestCallbacks || pendingGuestCallbacks.empty())"
+    if data.count(callback) != 1:
+        parser.error("Pinned IOP disc callback guard no longer matches")
+    adapted = adapted.replace(callback,
+        b"if (servicingGuestCallbacks || pendingGuestCallbacks.empty() || memory.interruptControl() == 0u)")
     timer = b"                    timrman.serviceDue(totalCycles, *this);"
     if data.count(timer) != 1:
         parser.error("Pinned IOP timer delivery boundary no longer matches")
@@ -67,7 +72,7 @@ def main():
             target.write_bytes(content)
     report = {"source_sha256": SOURCE_SHA256, "adapted_sha256": hashlib.sha256(adapted).hexdigest(),
               "kernel_sha256": KERNEL_SHA256, "adapted_kernel_sha256": hashlib.sha256(kernel).hexdigest(),
-              "policy": "Defer masked interrupts; preserve IOP critical sections and import load results"}
+              "policy": "Defer masked DMA, timer and disc callbacks; preserve IOP critical sections and import loads"}
     (output / "adaptation.json").write_text(json.dumps(report, indent=2) + "\n")
     print("Prepared private IOP interrupt and critical-section adaptations")
 
