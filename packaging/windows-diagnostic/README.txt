@@ -7,10 +7,14 @@ IRX.DAT. Game boot, graphics, audio output and gameplay require further work.
 No original game files or translated game code are included in this package.
 
 Extract the ZIP, open PowerShell in its folder and run the following, replacing
-the example with the path to your extracted PAL IRX.DAT:
+the example with the path to your extracted PAL IRX.DAT. Press Enter after
+each line; do not append $LASTEXITCODE to the executable command:
 
   .\yakuza_iop_probe.exe "D:\Yakuza PAL\IRX.DAT" > .\probe.txt 2>&1
   $LASTEXITCODE
+
+Windows PowerShell can label redirected stderr logs as NativeCommandError.
+Check the final exit code and module results as well as the log.
 
 Keep probe.txt and the displayed exit code. The Linux startup baseline reports
 nine loaded modules, 15 threads and eight RPC servers. A minimal-host message

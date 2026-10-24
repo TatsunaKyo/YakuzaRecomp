@@ -46,7 +46,10 @@ Unzip the diagnostic package, open PowerShell in that folder, and run:
 
 ```powershell
 .\yakuza_iop_probe.exe "D:\Yakuza PAL\IRX.DAT" > probe.txt 2>&1
+$LASTEXITCODE
 ```
+
+Run `$LASTEXITCODE` on its own line; the probe interprets every positional argument as an input file. Windows PowerShell may wrap ordinary stderr log messages as `NativeCommandError` when redirecting output. The final program exit code and module results establish whether startup succeeded.
 
 The minimal Linux diagnostic baseline ends with nine loaded modules, 15 threads and eight RPC servers. Start results 0 and 2 both represent resident modules. A driver initialization message about SIF not being initialized is present in this minimal host. Separately, continued original-game execution in the full Linux host loads all nine modules through the original EE-to-IOP DMA and module-start path; this does not verify every SIF service.
 
