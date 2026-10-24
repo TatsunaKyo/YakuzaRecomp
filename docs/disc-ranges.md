@@ -156,7 +156,17 @@ python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz
 
 Bundle 33 supplies both Dojima resources. Their 931,840 payload bytes pass range-integrity and original-index checks, with all 36 earlier records unchanged. There are now 38 excerpt records covering 681 indexed data/audio files and ten complete movies. Stage presentation, native sound and gameplay remain unverified.
 
-A native run now loads both files: the entire 922,616-byte stage archive and 7,508-byte English companion match their original bytes in EE RAM. Its next stop is an untranslated original method, rather than another missing archive range. The related 65-method family has been recovered; stage presentation, native sound and gameplay still require verification.
+A native run loads both files: the entire 922,616-byte stage archive and 7,508-byte English companion match their original bytes in EE RAM. That run exposed an untranslated original method. The related 65-method family has since been recovered.
+
+After additional IOP interrupt and RPC-ordering corrections, a continued diagnostic run finishes the Chapter 1 movie and caption without skip input, loads both Dojima files and advances through the previous resource-binding failure. Its next missing read is `/MEDIA3/ENEMY/ENECOMMONADV.BIN`: 27,808 original bytes at `OGRE3.CVM:0x3b26f000`, read as a 28,672-byte sector range.
+
+Bundle 34 groups all four shared files directly under `/MEDIA3/ENEMY/`: `ENECOMMON.BIN`, `ENECOMMON.DAT`, `ENECOMMONADV.BIN` and `ENECOMMOND.DAT`. They occupy one contiguous 507,904-byte range (496 KiB), ending at `0x3b2b2800`. Only `ENECOMMONADV.BIN` is the observed request; the other three companions are included to reduce separate small uploads:
+
+```powershell
+python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE3.CVM:0x3b236800:0x7c000 --output .\yakuza-boot-data-34.zip
+```
+
+The range starts after the already supplied Dojima archive and does not overlap either existing OGRE3 excerpt. Bundle 34 has not been supplied or imported yet. The successful run includes private error diagnostics that did not trigger. Another run encountered an original CRI invalid-handle error, which remains under investigation. Stage rendering, native audio, gameplay and original-game execution on Windows remain unverified.
 
 ## Import and run internally
 
