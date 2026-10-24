@@ -6,7 +6,7 @@ Current evidence:
 
 | Check | Result |
 | --- | --- |
-| Native Linux build and 48 Python tests | Passed |
+| Native Linux build and 57 Python tests | Passed |
 | Overlay loader swapping, bounds and BSS tests on Linux | Passed |
 | Original 11 overlays loaded into RAM; three translated routines on Linux | 768 cases passed; hardware/constructors/gameplay untested |
 | Four upstream IOP test programs on Linux | Passed |
@@ -29,6 +29,12 @@ Current evidence:
 | Stage-resource interface translation | Linux and Windows x64 hosts build with all five verified methods registered; 21 altered-catalog checks and a supported repeat pass. Eight Linux host checks pass. Linux passes the observed method and supplied `CSE_TITLE.DAT`. Its first 51,200-byte `TITLE.ADX` read matches EE RAM. Supplied `TALK_TITLE.BIN` now allows the original Start prompt and main menu to render readable text. Native audio playback and original-game Windows execution remain unverified |
 | New Game menu interfaces | Linux and Windows x64 hosts build with all 27 methods from 17 verified tables registered; 28 altered-word checks and a supported repeat pass. Eight Linux host checks pass. Start opens the original main menu and Cross selects New Game. Linux passes the callback and renders the original Chapter 1 heading after loading `CHAPTER1.DAT`. It also reads `MSSN4154.DAT`, whose complete sector matches EE RAM. The full Chapter 1 scene-data directory is now supplied; Linux passes the first descriptor stop and next requests the separate Chapter 1 movie. Image graphics and gameplay remain unverified |
 | Game boot, rendering, sound, input and gameplay | Pending |
+
+## Download the Windows diagnostic
+
+Successful Windows jobs in the [Development tools workflow](https://github.com/TatsunaKyo/YakuzaRecomp/actions/workflows/checks.yml) publish `windows-iop-diagnostic-x64`. Open a completed run and download that artifact. The ZIP contains a Release console diagnostic, instructions, licenses and a `build-info.json` with the exact source commit and executable checksum. The package uses the static MSVC runtime and needs no compiler, Python, Linux or WSL to run.
+
+Supply your own extracted `IRX.DAT` when testing. The package contains no original assets or translated game code. Its result checks Windows driver startup; full original-game Windows execution remains pending.
 
 ## Running the Windows diagnostic
 
