@@ -98,6 +98,8 @@ The pinned IOP emulator delivered scheduled sound-DMA interrupts while the CPU's
 
 [prepare_iop.py](../tools/prepare_iop.py) verifies the pinned emulator source and prepares a private copy that retains pending DMA interrupts while global interrupt control is disabled. Delivery resumes after the outer critical section restores interrupts. [The regression](../tests/test_iop_interrupts.cpp) checks both sound-DMA cores, ordinary disable/enable, nested suspend/restore, and exactly one eventual callback. This fixes the demonstrated interrupt rule; it does not establish that all movie stalls or native audio are fixed.
 
+The IOP scheduler also ended its current thread at every host instruction-budget boundary, even if interrupts remained disabled. A second regression places a delayed higher-priority thread beside a masked critical section; the original scheduler preempts that section when the host budget ends. The private scheduler now retains the running context until the critical section restores interrupts. Explicit guest yields, waits and exits still take their normal paths. The regression checks that priority scheduling resumes after restoration and that an explicit yield remains effective. Both adapted source files are fingerprinted before private output is written.
+
 ## VIF image uploads and private graphics diagnostics
 
 The memory-card dialog exposed a VIF1 transfer-boundary bug. Its font texture in GS memory began with eight bytes of VIF commands, followed by the exact original glyph data shifted eight bytes. Its palette was shifted by two 32-bit entries. A GIF IMAGE tag and its pixels can arrive in separate VIF DIRECT commands; the pinned interpreter treated the next VIF command words as pending image bytes.

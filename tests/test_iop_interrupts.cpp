@@ -2,6 +2,9 @@
 // Synthetic IOP module: sound DMA must respect global/nested interrupt masking.
 // IopHost fixture follows the pinned PS2Recomp emulator-test interface.
 #include "ps2x/iop/iop_subsystem.h"
+#include "core/iop_cpu.h"
+#include "core/iop_kernel.h"
+#include "core/iop_memory.h"
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -92,6 +95,53 @@ std::vector<uint8_t> module(unsigned core, bool nested) {
     for(unsigned i=0;i<6;++i){put32(image,0x414+i*8,0x03e00008);put32(image,0x418+i*8,0x24000000|ordinals[i]);}
     return image;
 }
+
+void checkCriticalSectionAcrossSlices() {
+    using namespace ps2x::iop::detail;
+    IopMemory memory;
+    IopKernel kernel(memory);
+    IopCpuState caller{};
+    const auto create=[&](unsigned priority) {
+        const uint32_t descriptor=memory.allocate(32,16);
+        memory.write32(descriptor+8,0x10000);
+        memory.write32(descriptor+12,0x1000);
+        memory.write32(descriptor+16,priority);
+        caller.gpr[4]=descriptor;
+        check(kernel.dispatchThreadImport(4,caller,0),"Cannot create synthetic IOP thread");
+        return caller.gpr[2];
+    };
+    const auto start=[&](uint32_t id) {
+        caller.gpr[4]=id;caller.gpr[5]=0;
+        check(kernel.dispatchThreadImport(6,caller,0),"Cannot start synthetic IOP thread");
+    };
+    const auto high=create(20),low=create(30);
+    start(high);
+    auto* highThread=kernel.beginNextReady(0);
+    check(highThread&&uint32_t(highThread->id)==high,"Higher-priority thread did not start");
+    kernel.delayCurrentUntil(100,highThread->cpu);
+    kernel.endTimeslice(*highThread,0xffffffff);
+    start(low);
+    auto* lowThread=kernel.beginNextReady(0);
+    check(lowThread&&uint32_t(lowThread->id)==low,"Lower-priority thread did not start");
+    memory.setInterruptControl(0);
+    kernel.endTimeslice(*lowThread,0xffffffff); // Host budget ends in a guest critical section.
+    auto* continued=kernel.beginNextReady(200); // The delayed high-priority thread's deadline has elapsed.
+    check(continued==lowThread,"IOP host time slice preempted a masked critical section");
+    memory.setInterruptControl(1);
+    kernel.endTimeslice(*continued,0xffffffff);
+    auto* resumed=kernel.beginNextReady(200);
+    check(resumed==highThread,"Deferred higher-priority thread did not run after interrupt restore");
+    kernel.delayCurrentUntil(400,highThread->cpu);
+    kernel.endTimeslice(*highThread,0xffffffff);
+    lowThread=kernel.beginNextReady(200);
+    check(lowThread&&uint32_t(lowThread->id)==low,"Cannot resume lower-priority thread for explicit yield");
+    memory.setInterruptControl(0);
+    check(kernel.dispatchThreadImport(16,lowThread->cpu,200),"Cannot request an explicit guest yield");
+    kernel.endTimeslice(*lowThread,0xffffffff);
+    check(kernel.beginNextReady(500)==highThread,"Masked host-budget handling suppressed an explicit guest yield");
+    memory.setInterruptControl(1);
+    std::cout<<"IOP critical section survives host budget boundaries; priority scheduling resumes after restore\n";
+}
 }
 
 int main() {
@@ -107,5 +157,6 @@ int main() {
         if(nested)check(result[3]==1&&result[4]==0&&result[5]==0,"Inner restore enabled IOP interrupts prematurely");
         check(result[2]==1&&result[6]==1,"Pending sound DMA interrupt was lost or delivered more than once");
     }
+    checkCriticalSectionAcrossSlices();
     std::cout<<"Both sound DMA cores defer masked interrupts and deliver once after outer restore\n";
 }

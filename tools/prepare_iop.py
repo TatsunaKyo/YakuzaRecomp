@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Prepare a checked private IOP emulator with masked sound DMA deferred."""
+"""Prepare checked private IOP interrupt and critical-section adapters."""
 from pathlib import Path
 import argparse
 import hashlib
 import json
 
 SOURCE_SHA256 = "01deb410d04f441be12adc68638846061f19759e007c36cdfcbe987796199d36"
+KERNEL_SHA256 = "203c9949793be35f30583612db855544356d1ec1124b96fdf9377e4d321c1002"
 
 
 def main():
@@ -27,12 +28,30 @@ def main():
            b"            // They become deliverable after the outer critical section restores I_CTRL.\n"
            b"            if (servicingDmaInterrupts || pendingDmaInterrupts.empty() || memory.interruptControl() == 0u)")
     adapted = data.replace(old, new)
-    target = output / "iop_emulator.cpp"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if not target.exists() or target.read_bytes() != adapted:
-        target.write_bytes(adapted)
+    kernel = (source_dir / "src/emulator/core/iop_kernel.cpp").read_bytes().replace(b"\r\n", b"\n")
+    if hashlib.sha256(kernel).hexdigest() != KERNEL_SHA256:
+        parser.error("Unsupported IOP scheduler source; reassess the pinned adaptation")
+    begin = b"    IopThread *IopKernel::beginNextReady(uint64_t currentCycle)\n    {\n"
+    end = b"        else if (thread.state == IopThreadState::Running)\n            thread.state = IopThreadState::Ready;"
+    if kernel.count(begin) != 1 or kernel.count(end) != 1:
+        parser.error("Pinned IOP scheduler boundaries no longer match")
+    kernel = kernel.replace(begin, begin +
+        b"        // Resume a critical section split by the host execution budget.\n"
+        b"        if (m_currentThread && m_currentThread->state == IopThreadState::Running)\n"
+        b"            return m_currentThread;\n\n")
+    kernel = kernel.replace(end,
+        b"        else if (thread.state == IopThreadState::Running)\n        {\n"
+        b"            // A host time slice is not a guest interrupt or a voluntary wait.\n"
+        b"            if (m_memory.interruptControl() == 0u && !thread.cpu.yielded)\n                return;\n"
+        b"            thread.state = IopThreadState::Ready;\n        }")
+    output.mkdir(parents=True, exist_ok=True)
+    for name, content in (("iop_emulator.cpp", adapted), ("iop_kernel.cpp", kernel)):
+        target = output / name
+        if not target.exists() or target.read_bytes() != content:
+            target.write_bytes(content)
     report = {"source_sha256": SOURCE_SHA256, "adapted_sha256": hashlib.sha256(adapted).hexdigest(),
-              "policy": "Retain pending sound DMA interrupts while I_CTRL is disabled"}
+              "kernel_sha256": KERNEL_SHA256, "adapted_kernel_sha256": hashlib.sha256(kernel).hexdigest(),
+              "policy": "Retain pending sound DMA and running IOP critical sections until interrupt restore"}
     (output / "adaptation.json").write_text(json.dumps(report, indent=2) + "\n")
     print("Prepared private IOP interrupt masking adaptation")
 
