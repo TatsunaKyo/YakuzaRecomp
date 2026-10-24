@@ -47,6 +47,12 @@ class SplitWriter(io.RawIOBase):
     def writable(self):
         return True
 
+    def seekable(self):
+        return False
+
+    def seek(self, offset, whence=0):
+        raise io.UnsupportedOperation("Split ZIP output cannot seek")
+
     def tell(self):
         return self.position
 

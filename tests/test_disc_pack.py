@@ -58,6 +58,32 @@ class DiscPackTests(unittest.TestCase):
             self.assertEqual(len(manifest["parts"]), 1)
             self.assertLess(manifest["zip_bytes"], 65536)
 
+    def test_zip64_offsets_above_four_gib_without_large_disk_allocation(self):
+        class ZeroFile:
+            def open(self, mode):
+                class ZeroReader(io.BytesIO):
+                    def read(self, count=-1):
+                        amount = min(count, disc_pack.LIMIT - self.tell())
+                        self.seek(self.tell() + amount)
+                        return bytes(amount)
+                return ZeroReader()
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            prefix_parts = 171
+            prefix_bytes = prefix_parts * disc_pack.LIMIT
+            self.assertGreater(prefix_bytes, 2 ** 32)
+            with disc_pack.SplitWriter(root, 4096) as writer:
+                writer.position = prefix_bytes  # A virtual self-extracting prefix.
+                with zipfile.ZipFile(writer, "w", allowZip64=True) as bundle:
+                    with bundle.open("OGRE.CVM", "w", force_zip64=True) as target:
+                        target.write(b"original-free ZIP64 boundary")
+            paths = [ZeroFile()] * prefix_parts + [root / p["name"] for p in writer.parts]
+            sizes = [disc_pack.LIMIT] * prefix_parts + [p["bytes"] for p in writer.parts]
+            with disc_pack.JoinedParts(paths, sizes) as joined, zipfile.ZipFile(joined) as bundle:
+                self.assertGreater(bundle.getinfo("OGRE.CVM").header_offset, 2 ** 32)
+                self.assertEqual(bundle.read("OGRE.CVM"), b"original-free ZIP64 boundary")
+
     def test_iso_and_gzip_single_open_with_sorted_archive_extents(self):
         for compressed in (False, True):
             with self.subTest(compressed=compressed), tempfile.TemporaryDirectory() as temp:

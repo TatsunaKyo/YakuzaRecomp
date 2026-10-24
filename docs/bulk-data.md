@@ -10,7 +10,7 @@ This is the most convenient route for a disc image of several gigabytes: one ext
 
 ## Windows split-ZIP collector
 
-[disc_pack.py](../tools/disc_pack.py) reads an extracted disc folder, ISO or `.iso.gz`, compresses the selected complete archives and splits the compressed ZIP stream into parts of at most **24 MiB**. It scans selected ISO extents in disc order in one session rather than reopening the compressed ISO for every part. It does not require a decompressed ISO copy. Memory use is bounded by small read buffers.
+[disc_pack.py](../tools/disc_pack.py) reads an extracted disc folder, ISO or `.iso.gz`, compresses the selected complete archives and splits the compressed ZIP stream into parts of at most **24 MiB**. It scans selected ISO extents in disc order in one session rather than reopening the compressed ISO for every part. It does not require a decompressed ISO copy. Memory use is bounded by small read buffers. ZIP64 supports combined archives and ZIP offsets beyond 4 GiB; the collector is not restricted to a 4 GB ZIP file.
 
 The number of parts depends on compression. A nearly 4 GB compressed disc image would still require many parts if transferred in full. Selecting only `OGRE3.CVM` is a useful starting point for the current enemy/stage-data boundary; its original size is about 1.1 GiB. It includes the presently missing `E434` data and future assets from that archive. Other archives may still be needed later.
 
