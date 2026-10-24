@@ -174,7 +174,7 @@ The next missing file is `/MEDIA/EFFECT/EFFECT_1ST.DAT`: 14,112 original bytes, 
 python .\disc_ranges.py collect --iso ".\Yakuza (Europe) (En,Fr,De,Es,It).iso.gz" --range OGRE.CVM:0x1a3c800:0x18c800 --output .\yakuza-boot-data-35.zip
 ```
 
-This includes `EFCPRI.DAT`, `EFC_KAB.DAT`, `EFFECT_1ST.DAT`, `EFFECT_E3.DAT`, `EFFECT_GMTG.DAT`, `EFFECT_TEST.DAT`, `ENVIRONMENT.DAT` and `PARTICLEDATABASE.DAT`. Only `EFFECT_1ST.DAT` is the observed request; companions are grouped to reduce separate uploads. Original-index bounds and collector limits are checked, and the range does not overlap existing excerpts. Bundle 35 has not been supplied yet. The run ended at this real data hole without a diagnostic timeout; no native capture remains active.
+This includes `EFCPRI.DAT`, `EFC_KAB.DAT`, `EFFECT_1ST.DAT`, `EFFECT_E3.DAT`, `EFFECT_GMTG.DAT`, `EFFECT_TEST.DAT`, `ENVIRONMENT.DAT` and `PARTICLEDATABASE.DAT`. Only `EFFECT_1ST.DAT` is the observed request; companions are grouped to reduce separate uploads. Original-index bounds and collector limits are checked, and the range does not overlap existing excerpts. Bundle 35 is supplied, verified and imported. All eight original files are complete, and all 39 previous excerpt records remain unchanged. There are now 40 records covering 693 complete indexed data/audio files and ten complete movies. A clean native run is checking execution beyond the former missing read; import verification alone does not establish execution of the companion files.
 
 ## Import and run internally
 
