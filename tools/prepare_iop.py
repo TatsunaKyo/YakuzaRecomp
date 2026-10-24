@@ -28,6 +28,13 @@ def main():
            b"            // They become deliverable after the outer critical section restores I_CTRL.\n"
            b"            if (servicingDmaInterrupts || pendingDmaInterrupts.empty() || memory.interruptControl() == 0u)")
     adapted = data.replace(old, new)
+    timer = b"                    timrman.serviceDue(totalCycles, *this);"
+    if data.count(timer) != 1:
+        parser.error("Pinned IOP timer delivery boundary no longer matches")
+    adapted = adapted.replace(timer,
+        b"                    // Hardware timer handlers also wait for global interrupt restoration.\n"
+        b"                    if (memory.interruptControl() != 0u)\n"
+        b"                        timrman.serviceDue(totalCycles, *this);")
     kernel = (source_dir / "src/emulator/core/iop_kernel.cpp").read_bytes().replace(b"\r\n", b"\n")
     if hashlib.sha256(kernel).hexdigest() != KERNEL_SHA256:
         parser.error("Unsupported IOP scheduler source; reassess the pinned adaptation")
@@ -51,9 +58,9 @@ def main():
             target.write_bytes(content)
     report = {"source_sha256": SOURCE_SHA256, "adapted_sha256": hashlib.sha256(adapted).hexdigest(),
               "kernel_sha256": KERNEL_SHA256, "adapted_kernel_sha256": hashlib.sha256(kernel).hexdigest(),
-              "policy": "Retain pending sound DMA and running IOP critical sections until interrupt restore"}
+              "policy": "Defer masked sound DMA and timer handlers; preserve running IOP critical sections"}
     (output / "adaptation.json").write_text(json.dumps(report, indent=2) + "\n")
-    print("Prepared private IOP interrupt masking adaptation")
+    print("Prepared private IOP interrupt and critical-section adaptations")
 
 
 if __name__ == "__main__":

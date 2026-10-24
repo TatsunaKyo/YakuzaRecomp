@@ -142,6 +142,72 @@ void checkCriticalSectionAcrossSlices() {
     memory.setInterruptControl(1);
     std::cout<<"IOP critical section survives host budget boundaries; priority scheduling resumes after restore\n";
 }
+
+// Phase 0 arms a one-shot timer and masks interrupts. Later modules restore
+// the inner/outer saved mask without replacing the first module's counter.
+std::vector<uint8_t> timerModule(bool nested, unsigned phase) {
+    const uint32_t load=base+phase*0x1000, timerImports=load+0x300, intrImports=load+0x380;
+    std::vector<uint8_t> image(0x600);
+    image[0]=0x7f;image[1]='E';image[2]='L';image[3]='F';image[4]=1;image[5]=1;image[6]=1;
+    put16(image,16,2);put16(image,18,8);put32(image,20,1);put32(image,24,load);put32(image,28,52);
+    put16(image,40,52);put16(image,42,32);put16(image,44,1);
+    put32(image,52,1);put32(image,56,0x100);put32(image,60,load);put32(image,64,load);
+    put32(image,68,0x500);put32(image,72,0x500);put32(image,76,7);put32(image,80,4);
+    std::vector<uint32_t> code;
+    const auto emit=[&](uint32_t word){code.push_back(word);};
+    const auto imm=[&](unsigned reg,uint32_t n){emit(0x3c000000u|(reg<<16)|(n>>16));emit(0x34000000u|(reg<<21)|(reg<<16)|(n&0xffff));};
+    const auto call=[&](uint32_t table,unsigned index){emit(0x0c000000u|((table+20+index*8)>>2));emit(0);};
+    emit(0x27bdfff0);emit(0xafbf000c);emit(0xafb00008);
+    if(phase==0) {
+        imm(4,1);imm(5,32);imm(6,1);call(timerImports,0); // AllocHardTimer SYSCLK/32-bit
+        emit(0x00408021); // Keep the allocated timer ID in s0.
+        emit(0x02002021);imm(5,100);imm(6,handler);imm(7,data);call(timerImports,1);
+        emit(0x02002021);imm(5,1);imm(6,0);imm(7,1);call(timerImports,2); // SetupHardTimer
+        emit(0x02002021);call(timerImports,3); // StartHardTimer
+        if(nested) {
+            imm(4,data+12);call(intrImports,2); // Outer CpuSuspendIntr
+            imm(4,data+16);call(intrImports,2); // Inner CpuSuspendIntr
+        } else call(intrImports,0); // CpuDisableIntr
+    } else if(nested) {
+        imm(8,data);emit(0x8d040000|(phase==1?16:12));emit(0);call(intrImports,3);
+    } else call(intrImports,1); // CpuEnableIntr
+    emit(0x8fb00008);emit(0x8fbf000c);emit(0x27bd0010);emit(0x03e00008);emit(0x00001021);
+    check(code.size()*4<0x200,"Synthetic timer entry overlaps handler");
+    for(size_t i=0;i<code.size();++i)put32(image,0x100+i*4,code[i]);
+    const std::array<uint32_t,7> irq={0x8c880000,0,0x25080001,0xac880000,0x00001021,0x03e00008,0};
+    if(phase==0)for(size_t i=0;i<irq.size();++i)put32(image,0x300+i*4,irq[i]);
+    const auto table=[&](size_t offset,const char* name,std::array<unsigned,4> ordinals) {
+        put32(image,offset,0x41e00000);put32(image,offset+8,0x00000103);
+        std::memcpy(image.data()+offset+12,name,7);
+        for(unsigned i=0;i<4;++i){put32(image,offset+20+i*8,0x03e00008);put32(image,offset+24+i*8,0x24000000|ordinals[i]);}
+    };
+    table(0x400,"timrman",{4,20,22,23});table(0x480,"intrman",{8,9,17,18});
+    return image;
+}
+
+void checkMaskedTimer(bool nested) {
+    Host host;IopSubsystem iop(host);
+    const auto load=[&](unsigned phase) {
+        auto image=timerModule(nested,phase);
+        check(host.writeGuest(0x100,image.data(),image.size()),"Cannot write synthetic timer module");
+        auto result=iop.loadModuleBuffer(0x100);
+        check(result.handled&&result.startResult==0,"Synthetic timer module did not return normally");
+    };
+    const auto count=[&]() {
+        uint32_t n=0;check(iop.readMemory(data,&n,sizeof(n)),"Cannot read timer counter");return n;
+    };
+    load(0);iop.runEeCycles(8000);
+    check(count()==0,"Timer interrupt ran inside a masked IOP critical section");
+    if(nested) {
+        load(1);iop.runEeCycles(8000);
+        check(count()==0,"Timer interrupt ran after an inner disabled restore");
+    }
+    load(nested?2:1);iop.runEeCycles(8000);
+    check(count()==1,"Pending timer interrupt was lost after outer restore");
+    iop.runEeCycles(8000);
+    check(count()==1,"One-shot timer interrupt was delivered more than once");
+    std::cout<<"Timer interrupt respects "<<(nested?"nested":"ordinary")<<" interrupt masking\n";
+}
 }
 
 int main() {
@@ -158,5 +224,7 @@ int main() {
         check(result[2]==1&&result[6]==1,"Pending sound DMA interrupt was lost or delivered more than once");
     }
     checkCriticalSectionAcrossSlices();
+    checkMaskedTimer(false);
+    checkMaskedTimer(true);
     std::cout<<"Both sound DMA cores defer masked interrupts and deliver once after outer restore\n";
 }
