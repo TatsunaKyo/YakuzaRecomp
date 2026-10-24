@@ -142,7 +142,10 @@ void dump_graphics(PS2Runtime& runtime, const std::filesystem::path& folder) {
               << ',' << unsigned(tex.psm) << ',' << unsigned(tex.tw) << ',' << unsigned(tex.th)
               << " clut=" << tex.cbp << ',' << unsigned(tex.cpsm) << ',' << unsigned(tex.csm)
               << ',' << unsigned(tex.csa) << ',' << unsigned(tex.cld)
-              << " clamp=" << ctx.clamp << " test=" << ctx.test << " alpha=" << ctx.alpha << '\n';
+              << " clamp=" << ctx.clamp << " test=" << ctx.test << " alpha=" << ctx.alpha
+              << " xyoffset_raw=" << ctx.xyoffset.ofx << ',' << ctx.xyoffset.ofy
+              << " scissor=" << ctx.scissor.x0 << ',' << ctx.scissor.y0
+              << ',' << ctx.scissor.x1 << ',' << ctx.scissor.y1 << '\n';
     }
     for (const auto& event : runtime.gs().getDebugHistory()) {
         const auto& tex = event.tex0;
