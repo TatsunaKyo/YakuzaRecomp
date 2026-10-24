@@ -145,7 +145,7 @@ void checkCriticalSectionAcrossSlices() {
 
 // Phase 0 arms a one-shot timer and masks interrupts. Later modules restore
 // the inner/outer saved mask without replacing the first module's counter.
-std::vector<uint8_t> timerModule(bool nested, unsigned phase) {
+std::vector<uint8_t> timerModule(bool nested, unsigned phase, bool delayedArgument=false) {
     const uint32_t load=base+phase*0x1000, timerImports=load+0x300, intrImports=load+0x380;
     std::vector<uint8_t> image(0x600);
     image[0]=0x7f;image[1]='E';image[2]='L';image[3]='F';image[4]=1;image[5]=1;image[6]=1;
@@ -169,7 +169,16 @@ std::vector<uint8_t> timerModule(bool nested, unsigned phase) {
             imm(4,data+16);call(intrImports,2); // Inner CpuSuspendIntr
         } else call(intrImports,0); // CpuDisableIntr
     } else if(nested) {
-        imm(8,data);emit(0x8d040000|(phase==1?16:12));emit(0);call(intrImports,3);
+        imm(8,data);
+        if(delayedArgument) {
+            // The import thunk consumes the pending load before its real
+            // function reads a0. Keep an opposite stale value to expose it.
+            imm(4,phase==1?1:0);
+            emit(0x0c000000u|((intrImports+20+3*8)>>2));
+            emit(0x8d040000|(phase==1?16:12)); // lw a0 in the JAL delay slot.
+        } else {
+            emit(0x8d040000|(phase==1?16:12));emit(0);call(intrImports,3);
+        }
     } else call(intrImports,1); // CpuEnableIntr
     emit(0x8fb00008);emit(0x8fbf000c);emit(0x27bd0010);emit(0x03e00008);emit(0x00001021);
     check(code.size()*4<0x200,"Synthetic timer entry overlaps handler");
@@ -185,10 +194,10 @@ std::vector<uint8_t> timerModule(bool nested, unsigned phase) {
     return image;
 }
 
-void checkMaskedTimer(bool nested) {
+void checkMaskedTimer(bool nested, bool delayedArgument=false) {
     Host host;IopSubsystem iop(host);
     const auto load=[&](unsigned phase) {
-        auto image=timerModule(nested,phase);
+        auto image=timerModule(nested,phase,delayedArgument);
         check(host.writeGuest(0x100,image.data(),image.size()),"Cannot write synthetic timer module");
         auto result=iop.loadModuleBuffer(0x100);
         check(result.handled&&result.startResult==0,"Synthetic timer module did not return normally");
@@ -206,7 +215,8 @@ void checkMaskedTimer(bool nested) {
     check(count()==1,"Pending timer interrupt was lost after outer restore");
     iop.runEeCycles(8000);
     check(count()==1,"One-shot timer interrupt was delivered more than once");
-    std::cout<<"Timer interrupt respects "<<(nested?"nested":"ordinary")<<" interrupt masking\n";
+    std::cout<<"Timer interrupt respects "<<(nested?"nested":"ordinary")
+             <<" interrupt masking; delay-slot argument="<<delayedArgument<<'\n';
 }
 }
 
@@ -226,5 +236,6 @@ int main() {
     checkCriticalSectionAcrossSlices();
     checkMaskedTimer(false);
     checkMaskedTimer(true);
+    checkMaskedTimer(true,true);
     std::cout<<"Both sound DMA cores defer masked interrupts and deliver once after outer restore\n";
 }
