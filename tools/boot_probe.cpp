@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <thread>
+#include <vector>
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -166,7 +167,13 @@ void dump_graphics(PS2Runtime& runtime, const std::filesystem::path& folder) {
     std::ofstream ee(folder / "ee-ram.bin", std::ios::binary);
     ee.write(reinterpret_cast<const char*>(runtime.memory().getRDRAM()), PS2_RAM_SIZE);
     if (!ee) throw std::runtime_error("Cannot write private EE graphics source memory");
-    std::cout << "[yakuza-gs] saved private graphics trace, VRAM and EE source memory in state/graphics\n";
+    std::vector<uint8_t> iop_memory(2u * 1024u * 1024u);
+    if (!runtime.readIopMemory(0, iop_memory.data(), iop_memory.size()))
+        throw std::runtime_error("Cannot read complete private IOP memory");
+    std::ofstream iop(folder / "iop-ram.bin", std::ios::binary);
+    iop.write(reinterpret_cast<const char*>(iop_memory.data()), iop_memory.size());
+    if (!iop) throw std::runtime_error("Cannot write private IOP source memory");
+    std::cout << "[yakuza-gs] saved private graphics trace, VRAM, EE and IOP source memory in state/graphics\n";
 }
 void verify_input(const std::filesystem::path& path, uint64_t length, uint64_t expected) {
     if (std::filesystem::file_size(path) != length) throw std::runtime_error("Unsupported PAL input size");
