@@ -180,5 +180,41 @@ int main() {
     calledPC = callCount = 0;
     memory.processVIF1Data(reinterpret_cast<const uint8_t*>(&afterReset), sizeof(afterReset));
     check(calledPC == 0x118 && callCount == 1, "VIF reset retained a partial command word");
+
+    // A rendering stream waits at an interrupting FLUSHE until the EE has
+    // acknowledged it. MARK must still identify that barrier in the handler.
+    memory.write32(0x10003c10, 1);
+    const uint32_t barriers[] = {0x07000001, 0x90000000, 0x07000002,
+                                 0x93000000, 0x07000003};
+    memory.processVIF1Data(reinterpret_cast<const uint8_t*>(barriers), sizeof(barriers));
+    check(memory.vif1_regs.mark == 1, "Interrupting FLUSHE ran past its original MARK barrier");
+    check((memory.vif1_regs.stat & 0xc00u) == 0xc00u &&
+          (memory.read32(0x1000f000) & (1u << 5)),
+          "Completed FLUSHE did not raise VIF1 VIS/INT and INTC cause 5");
+    memory.write32(0x1000f000, 1u << 5);
+    check(!(memory.read32(0x1000f000) & (1u << 5)) && (memory.vif1_regs.stat & 0x400u),
+          "INTC acknowledgement resumed the stalled VIF stream");
+    memory.write32(0x10003c10, 8);
+    check(memory.vif1_regs.mark == 2 && (memory.vif1_regs.stat & 0xc00u) == 0xc00u,
+          "STC lost the next FLUSHA barrier or its interrupt");
+    memory.write32(0x1000f000, 1u << 5);
+    memory.write32(0x10003c10, 8);
+    check(memory.vif1_regs.mark == 3 && !(memory.vif1_regs.stat & 0xc00u),
+          "Second STC did not resume exactly through the next MARK");
+
+    memory.write32(0x10003c10, 1);
+    const uint32_t fragmentedBarrier[] = {0x07000004, 0x90000000, 0x07000005};
+    const auto* fragmentedBytes = reinterpret_cast<const uint8_t*>(fragmentedBarrier);
+    memory.processVIF1Data(fragmentedBytes, 10);
+    memory.processVIF1Data(fragmentedBytes + 10, 2);
+    check(memory.vif1_regs.mark == 4, "New delivery ran while the VIF interrupt was stalled");
+    memory.write32(0x1000f000, 1u << 5);
+    memory.write32(0x10003c10, 8);
+    check(memory.vif1_regs.mark == 5, "STC lost a split command retained behind the interrupt");
+    memory.processVIF1Data(reinterpret_cast<const uint8_t*>(barriers), sizeof(barriers));
+    memory.write32(0x10003c10, 1);
+    memory.write32(0x10003c10, 8);
+    check(memory.vif1_regs.mark == 0 && !(memory.vif1_regs.stat & 0xc00u),
+          "VIF reset replayed commands from an earlier interrupt stall");
     std::cout << "VIF DIRECT/IMAGE, " << boundaries << " command fragmentation boundaries, IRQ acknowledgement and reset pass\n";
 }

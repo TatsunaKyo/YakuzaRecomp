@@ -17,6 +17,7 @@ set(runtime_private "${CMAKE_CURRENT_BINARY_DIR}/runtime-private")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_vif.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_vif_irq.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_ipu.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_spr.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_mmi.py"

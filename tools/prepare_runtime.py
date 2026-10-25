@@ -11,6 +11,7 @@ from pathlib import Path
 
 from prepare_game import require
 from prepare_vif import adapt_vif
+from prepare_vif_irq import adapt_flush_interrupts
 from prepare_ipu import adapt_ipu, adapt_ipu_faults
 from prepare_spr import adapt_spr
 from prepare_mmi import adapt_mmi, MACROS_SHA256
@@ -125,6 +126,8 @@ def main():
             "Unsupported runtime header: runtime/ps2_memory.h")
     texts["ps2_vif1_interpreter.cpp"], texts["ps2_memory.cpp"], memory_header = adapt_vif(
         texts["ps2_vif1_interpreter.cpp"], texts["ps2_memory.cpp"], memory_header.decode())
+    texts["ps2_vif1_interpreter.cpp"], texts["ps2_memory.cpp"], texts["Kernel/EeScheduler.cpp"] = adapt_flush_interrupts(
+        texts["ps2_vif1_interpreter.cpp"], texts["ps2_memory.cpp"], texts["Kernel/EeScheduler.cpp"])
     texts["ps2_memory.cpp"] = adapt_spr(adapt_ipu(texts["ps2_memory.cpp"]))
     # Copy the complete include tree so quoted sibling includes and PCHs see
     # the same adapted PS2Memory layout in every translation unit.
