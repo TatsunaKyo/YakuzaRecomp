@@ -33,8 +33,10 @@ void vif_check(bool value, const char* message) {
 void vif_irq_handler(uint8_t* memory, R5900Context* context, PS2Runtime* runtime) {
     vif_check(GPR_U32(context, 4) == 5, "VIF1 handler received the wrong INTC cause");
     ++vifInterrupts;
-    vif_check(runtime->memory().vif1_regs.mark == vifInterrupts,
+    vif_check(runtime->memory().read32(0x10003c30) == vifInterrupts &&
+              (runtime->memory().read32(0x10003c00) & 0x40u),
               "VIF1 handler lost the MARK belonging to its flush barrier");
+    runtime->Store32(memory, context, 0x10003c30, 0); // Clear MRK after reading it.
     runtime->Store32(memory, context, 0x10003c10, 8); // Original-style STC acknowledgement.
     context->pc = GPR_U32(context, 31);
 }

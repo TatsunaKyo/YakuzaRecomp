@@ -137,9 +137,14 @@ int main() {
     append(registers, uint32_t(0x14000023));
     everyBoundary(registers, [] {}, [&] {
         check(memory.vif1_regs.mask == 0x31415926, "Fragmented STMASK lost its value");
+        check(memory.read32(0x10003c70) == 0x31415926, "Guest read lost the current VIF1 mask");
         for (unsigned i = 0; i < 4; ++i) {
             check(memory.vif1_regs.row[i] == 0x14000300u + i, "Fragmented STROW changed a lane");
             check(memory.vif1_regs.col[i] == 0x14000400u + i, "Fragmented STCOL changed a lane");
+            check(memory.read32(0x10003d00 + i * 16) == 0x14000300u + i,
+                  "Guest ROW read used the wrong VIF1 register offset");
+            check(memory.read32(0x10003d40 + i * 16) == 0x14000400u + i,
+                  "Guest COL read used the wrong VIF1 register offset");
         }
     });
 
@@ -188,6 +193,9 @@ int main() {
                                  0x93000000, 0x07000003};
     memory.processVIF1Data(reinterpret_cast<const uint8_t*>(barriers), sizeof(barriers));
     check(memory.vif1_regs.mark == 1, "Interrupting FLUSHE ran past its original MARK barrier");
+    check(memory.read32(0x10003c30) == 1 &&
+          (memory.read32(0x10003c00) & 0xc40u) == 0xc40u,
+          "Guest VIF1 MARK/STAT reads do not expose the actual interrupt barrier");
     check((memory.vif1_regs.stat & 0xc00u) == 0xc00u &&
           (memory.read32(0x1000f000) & (1u << 5)),
           "Completed FLUSHE did not raise VIF1 VIS/INT and INTC cause 5");
@@ -216,5 +224,10 @@ int main() {
     memory.write32(0x10003c10, 8);
     check(memory.vif1_regs.mark == 0 && !(memory.vif1_regs.stat & 0xc00u),
           "VIF reset replayed commands from an earlier interrupt stall");
+    const uint32_t vif0Commands[] = {0x01000404, 0x07001234};
+    memory.processVIF0Data(reinterpret_cast<const uint8_t*>(vif0Commands), sizeof(vif0Commands));
+    check(memory.read32(0x10003830) == 0x1234 && memory.read32(0x10003840) == 0x404 &&
+          memory.read32(0x10003880) == 0x07001234 && memory.read32(0x10003c30) == 0,
+          "Guest reads did not preserve the independent live VIF0/VIF1 banks");
     std::cout << "VIF DIRECT/IMAGE, " << boundaries << " command fragmentation boundaries, IRQ acknowledgement and reset pass\n";
 }

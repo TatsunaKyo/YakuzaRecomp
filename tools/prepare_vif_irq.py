@@ -73,6 +73,45 @@ def adapt_flush_interrupts(vif, memory, scheduler):
                 }
             }
 """)
+    read_start = memory.index("uint32_t PS2Memory::readIORegister(uint32_t address)")
+    memory_prefix, reads = memory[:read_start], memory[read_start:]
+    reads = once(reads, "    auto it = m_ioRegisters.find(address);\n", """    // Commands update the live register bank, not the CPU write shadow.
+    // In particular, an EE interrupt handler must see the current MARK/MRK.
+    if ((address >= 0x10003800u && address < 0x10003A00u) ||
+        (address >= 0x10003C00u && address < 0x10003E00u))
+    {
+        const bool vif1 = address >= 0x10003C00u;
+        const auto &regs = vif1 ? vif1_regs : vif0_regs;
+        const uint32_t offset = address - (vif1 ? 0x10003C00u : 0x10003800u);
+        switch (offset)
+        {
+        case 0x00u: return regs.stat;
+        case 0x10u: return regs.fbrst;
+        case 0x20u: return regs.err;
+        case 0x30u: return regs.mark;
+        case 0x40u: return regs.cycle;
+        case 0x50u: return regs.mode;
+        case 0x60u: return regs.num;
+        case 0x70u: return regs.mask;
+        case 0x80u: return regs.code;
+        case 0x90u: return regs.itops;
+        case 0xA0u: return regs.base;
+        case 0xB0u: return regs.ofst;
+        case 0xC0u: return regs.tops;
+        case 0xD0u: return regs.itop;
+        case 0xE0u: return regs.top;
+        default:
+            if ((offset & 0xFu) == 0u && offset >= 0x100u && offset <= 0x130u)
+                return regs.row[(offset - 0x100u) >> 4];
+            if ((offset & 0xFu) == 0u && offset >= 0x140u && offset <= 0x170u)
+                return regs.col[(offset - 0x140u) >> 4];
+            return 0u;
+        }
+    }
+
+    auto it = m_ioRegisters.find(address);
+""")
+    memory = memory_prefix + reads
     scheduler = once(scheduler, """bool EeScheduler::checkpointDue(uint32_t cycles) noexcept
 {
     accountCycles(cycles);
