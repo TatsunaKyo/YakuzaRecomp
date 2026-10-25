@@ -142,8 +142,12 @@ foreach(source IN LISTS boot_generated)
 endforeach()
 if(WIN32)
     target_compile_definitions(yakuza_boot_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    # Translated Debug functions can consume nearly 1 MiB in one native frame.
+    # Reserve a Linux-sized host stack; the emulated PS2 stack is unchanged.
     if(MINGW)
-        target_link_options(yakuza_boot_probe PRIVATE -municode)
+        target_link_options(yakuza_boot_probe PRIVATE -municode "-Wl,--stack,8388608")
+    elseif(MSVC)
+        target_link_options(yakuza_boot_probe PRIVATE "/STACK:8388608")
     endif()
 endif()
 if(BUILD_TESTING)

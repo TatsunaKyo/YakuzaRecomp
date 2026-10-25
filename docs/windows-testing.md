@@ -6,7 +6,9 @@
 
 Extract every file, double-click `Run-Yakuza.cmd` and select the folder containing your own extracted European/PAL disc files (`SLES_541.71`). Keep the CVM archives intact. Python, a compiler, Linux/WSL and a PS2 BIOS are not required to run this test.
 
-This package is an experimental native host, with original-game Windows execution awaiting player testing. Linux testing reaches title/chapter artwork and textured scenes, with known movie artifacts, slow execution and a later untranslated call. Interactive gameplay, sound and saves remain unverified. The package contains compiled translated code and no original disc data.
+This package is an experimental native host. A Windows 11 log confirms OpenGL/WASAPI device initialization, original ELF boot execution and the MAIN.BIN read, then ends before the verified MAIN checkpoint. The reported exit code is `-1073741571` (`0xC00000FD`, Windows `STATUS_STACK_OVERFLOW`). Linux testing reaches title/chapter artwork and textured scenes, with known movie artifacts, slow execution and a later untranslated call. Interactive gameplay, sound and saves remain unverified. The package contains compiled translated code and no original disc data.
+
+The initial Windows host reserves 1 MiB of native thread stack. Its unwind metadata identifies one translated constructor with a 1,018,472-byte static frame, leaving very little space for callers. The current source reserves 8 MiB for the Windows native host; the PS2 guest stack is unchanged. A Windows retest is needed to verify progress with this larger native stack.
 
 The launcher writes `native-test.log` and prints the exit code. Escape or closing the window deliberately stops the probe and may return code 1; inspect the last log lines. The public ZIP was downloaded after publication and its SHA-256 matched `0c112c8ee7e2bd939dfb79503509516b44676b57f15a2747f7e704cd8949f1ad`.
 
