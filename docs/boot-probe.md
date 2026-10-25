@@ -134,6 +134,8 @@ The old host fails with `Interrupting FLUSHE ran past its original MARK barrier`
 
 The subsequent longer run 198 reaches a new missing original direct call: JAL at `0x684e0c` targets untranslated `0x36e110`. It stops there before its planned host Escape, with nine IOP drivers and no recorded CRI error. This is a translation boundary, not a completed scene or gameplay milestone; no further original asset upload is required.
 
+The target's bytes match the verified original ELF and the stopped run's RAM. Fresh analysis and translation add its 31 instructions without changing any of the 404 earlier supplemental sources. The new supplement has 405 ranges, 6,502 instructions and 332,103 callable entries, retaining all previous entries. Generation reports no errors, unhandled instructions or critical fallbacks; the existing 84 control-flow warnings remain. Both full hosts build. On Linux, nine golden cases execute the translated routine against synthetic records, including empty groups, padding bytes and 255-element limits, and confirm its result and unchanged input memory. A full scene replay beyond the former stop remains pending.
+
 ## VIF image uploads and private graphics diagnostics
 
 The memory-card dialog exposed a VIF1 transfer-boundary bug. Its font texture in GS memory began with eight bytes of VIF commands, followed by the exact original glyph data shifted eight bytes. Its palette was shifted by two 32-bit entries. A GIF IMAGE tag and its pixels can arrive in separate VIF DIRECT commands; the pinned interpreter treated the next VIF command words as pending image bytes.

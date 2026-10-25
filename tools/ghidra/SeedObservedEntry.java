@@ -20,11 +20,11 @@ public class SeedObservedEntry extends GhidraScript {
                 throw new IllegalStateException("Observed target conflicts with a classified function");
             clearListing(entry, entry.add(3));
             if (!disassemble(entry) || createFunction(entry, String.format("observed_boot_%08x", target)) == null)
-                throw new IllegalStateException("Could not seed observed indirect target");
+                throw new IllegalStateException("Could not seed observed call target");
         }
         currentProgram.getListing().setComment(entry, CodeUnit.PLATE_COMMENT,
-            "Indirect entry observed in a SHA-256-verified PAL native boot trace; original bytes preserved.");
+            "Call entry observed in a SHA-256-verified PAL native boot trace; original bytes preserved.");
         analyzeChanges(currentProgram);
-        println("Analyzed observed PAL indirect entry " + entry);
+        println("Analyzed observed PAL call entry " + entry);
     }
 }
