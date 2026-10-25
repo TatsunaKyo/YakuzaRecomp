@@ -6,7 +6,7 @@ The goal is to bring the original PS2 game to **Windows 10/11 x64** through stat
 
 **Status: early development. There is no playable game build yet.** The current tools prepare original disc files, analyze game code, test runtime components and build an opt-in full-runtime boot probe. Diagnostic executables are development tools, not the game.
 
-An [experimental Windows PAL test ZIP](https://github.com/TatsunaKyo/YakuzaRecomp/releases/tag/windows-pal-test-20261025) is now available. Extract it, run `Run-Yakuza.cmd` and select your own extracted PAL disc folder. The initial Windows test reaches the original boot loader, then reports a native stack overflow after reading MAIN.BIN. An 8 MiB host-stack build is awaiting retesting. This is an early development test.
+An [experimental Windows PAL test ZIP](https://github.com/TatsunaKyo/YakuzaRecomp/releases/tag/windows-pal-test-20261025) is available as an initial baseline. That package reports a native stack overflow after reading MAIN.BIN. A subsequent private test with an 8 MiB host stack reaches verified MAIN execution and loads all nine original IOP drivers on Windows 11. Further progress in that test is blocked by disc-file lookup failures; rendering and gameplay on Windows remain unverified. See [Windows testing](docs/windows-testing.md) for the required data layout.
 
 This is an unofficial fan project, unaffiliated with SEGA. Original game files are not distributed with this repository.
 
@@ -33,7 +33,7 @@ The next milestones are:
 
 1. **Reach and validate gameplay.** Follow the original scene sequence and resolve newly observed runtime or translation failures.
 2. **Improve rendering and speed.** Trace the remaining movie artifacts and measure expensive execution paths.
-3. **Validate Windows execution.** Test the private native host on Windows 11. Cross-compilation and synthetic Windows CI do not establish original-game compatibility.
+3. **Continue Windows validation.** Resolve the disc-file lookup failures after verified MAIN execution and all nine IOP driver starts, then compare rendering and input with the Linux host.
 4. **Validate controls, sound and saves.** Check these features with the original PAL data as gameplay becomes accessible.
 
 There is no release date yet. See [boot development](docs/boot-probe.md), [Windows validation](docs/windows-testing.md) and the [disc collection tools](docs/disc-ranges.md) for the research workflow.

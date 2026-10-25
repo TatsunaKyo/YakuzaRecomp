@@ -6,9 +6,11 @@
 
 Extract every file, double-click `Run-Yakuza.cmd` and select the folder containing your own extracted European/PAL disc files (`SLES_541.71`). Keep the CVM archives intact. Python, a compiler, Linux/WSL and a PS2 BIOS are not required to run this test.
 
-This package is an experimental native host. A Windows 11 log confirms OpenGL/WASAPI device initialization, original ELF boot execution and the MAIN.BIN read, then ends before the verified MAIN checkpoint. The reported exit code is `-1073741571` (`0xC00000FD`, Windows `STATUS_STACK_OVERFLOW`). Linux testing reaches title/chapter artwork and textured scenes, with known movie artifacts, slow execution and a later untranslated call. Interactive gameplay, sound and saves remain unverified. The package contains compiled translated code and no original disc data.
+The selected disc folder must contain all 14 root files: `SYSTEM.CNF`, `SLES_541.71`, `MAIN.BIN`, `IRX.DAT`, `IOPRP300.IMG`, `PAL_NTSC.DAT`, `OGRE.CVM`, `OGRE2.CVM`, `OGRE3.CVM`, `OGRE4.CVM`, `OGREDIR.BIN`, `OGREDIR2.BIN`, `OGREDIR3.BIN` and `OGREDIR4.BIN`. A folder containing only boot files and an `.iso` or `.iso.gz` is insufficient for this native test. For a compressed image, use 7-Zip to extract `.iso.gz` to `.iso`, open the ISO and extract all its root files into one folder. Do not unpack the CVM archives. The [current launcher source](../packaging/windows-native/Run-Yakuza.cmd) checks every required filename before starting; the earlier packaged launcher checks only the two boot inputs.
 
-The initial Windows host reserves 1 MiB of native thread stack. Its unwind metadata identifies one translated constructor with a 1,018,472-byte static frame, leaving very little space for callers. The current source reserves 8 MiB for the Windows native host; the PS2 guest stack is unchanged. A Windows retest is needed to verify progress with this larger native stack.
+This package is an experimental native host. The initial Windows 11 test reports `-1073741571` (`0xC00000FD`, Windows `STATUS_STACK_OVERFLOW`) after reading MAIN.BIN. The public baseline reserves 1 MiB of native thread stack; its unwind metadata identifies one translated constructor with a 1,018,472-byte static frame. The current source reserves 8 MiB, leaving the PS2 guest stack unchanged.
+
+A subsequent private 8 MiB test on Windows 11 reaches the verified original MAIN entry and loads all nine IOP drivers through the original EE-to-IOP path. It then reports failed lookups for `PAL_NTSC.DAT` and all eight CVM/index files. The selected folder's contents still need checking; these failures do not yet distinguish absent files from a host path issue. The player stopped the test after a blank window became purple. Neither that color nor high CPU use establishes correct rendering or compilation: translated code is compiled before packaging. Linux testing reaches title/chapter artwork and textured scenes, with known movie artifacts, slow execution and a later untranslated call. Interactive gameplay, sound and saves remain unverified. The package contains compiled translated code and no original disc data.
 
 The launcher writes `native-test.log` and prints the exit code. Escape or closing the window deliberately stops the probe and may return code 1; inspect the last log lines. The public ZIP was downloaded after publication and its SHA-256 matched `0c112c8ee7e2bd939dfb79503509516b44676b57f15a2747f7e704cd8949f1ad`.
 
@@ -27,7 +29,7 @@ Current evidence:
 | LLVM-MinGW cross-build of the diagnostic for Windows x64 | Passed |
 | LLVM-MinGW cross-build of overlay tests and translated routine probe | Passed; execution pending |
 | Windows PE inspection | x86-64 console executable; only Windows system/UCRT DLL imports |
-| Original game execution on actual Windows | Pending |
+| Original game execution on actual Windows | Private 8 MiB host reaches verified MAIN and starts all nine original IOP drivers on Windows 11; subsequent disc-file lookups fail. Rendering, input and gameplay remain unverified |
 | GitHub Actions Windows/MSVC and Linux default build and tests | Passed for 64425c2; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39945232867) |
 | Full-runtime Windows/MSVC host build and eight host checks | Passed with synthetic code, including IPU block/IDCT, color conversion and scratchpad DMA checks; same CI run |
 | IPU MPEG blocks and RGB32 conversion on Linux and Windows cross-build | Golden pixel and DMA checks pass on Linux; Windows x64 host/test executables cross-build. Original movie playback remains unverified |

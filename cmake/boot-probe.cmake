@@ -198,4 +198,10 @@ if(BUILD_TESTING)
     add_test(NAME boot_host_input_validation
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_boot_cli.py"
                 "$<TARGET_FILE:yakuza_boot_probe>")
+    if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
+        add_test(NAME boot_windows_launcher
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_windows_launcher.py"
+                --exe "$<TARGET_FILE:yakuza_boot_probe>"
+                --launcher "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows-native/Run-Yakuza.cmd")
+    endif()
 endif()
