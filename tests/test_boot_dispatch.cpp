@@ -4,6 +4,7 @@
 #include "ps2_runtime_macros.h"
 #include "runtime/ee_scheduler.h"
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 
 namespace {
@@ -98,7 +99,9 @@ int main() {
         PS2Runtime::GuestBranchKind::DirectCall, "explicit return"));
     check(context.pc == caller && GPR_U32((&context), 29) == stack);
 
-    PS2Runtime interruptRuntime;
+    // Keep additional 523 KiB hosts off Windows' default 1 MiB test stack.
+    auto interruptOwner = std::make_unique<PS2Runtime>();
+    auto& interruptRuntime = *interruptOwner;
     check(interruptRuntime.memory().initialize());
     R5900Context irqContext{};
     irqContext.pc = entry;
@@ -110,7 +113,8 @@ int main() {
     interruptRuntime.eeScheduler().setIrqCauseEnabled(false, 5, false);
     interruptRuntime.eeScheduler().run();
 
-    PS2Runtime clockRuntime;
+    auto clockOwner = std::make_unique<PS2Runtime>();
+    auto& clockRuntime = *clockOwner;
     check(clockRuntime.memory().initialize());
     clockRuntime.eeScheduler().reset(clockRuntime.memory().getRDRAM(), irqContext);
     check(clockRuntime.replaceFunction(entry, vblank_status));
