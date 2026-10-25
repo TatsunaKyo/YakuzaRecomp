@@ -8,6 +8,7 @@ set(PS2X_ENABLE_AGRESSIVE_LOGS OFF CACHE BOOL "Bound logs during boot tracing" F
 set(PS2X_ENABLE_IOP_RPC_TRACE ON CACHE BOOL "Keep missing RPC diagnostics" FORCE)
 add_subdirectory("${ps2recomp_SOURCE_DIR}/ps2xRuntime" "${CMAKE_BINARY_DIR}/ps2-runtime" EXCLUDE_FROM_ALL)
 target_link_libraries(ps2_runtime PRIVATE yakuza_ipu yakuza_scratchpad_dma)
+target_sources(ps2_runtime PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/vu0_macro.cpp")
 if(NOT MSVC)
     target_compile_options(ps2_runtime PUBLIC -msse4.1)
 endif()
@@ -39,6 +40,16 @@ target_include_directories(ps2_runtime BEFORE PUBLIC "${runtime_private}/include
 target_include_directories(ps2_runtime BEFORE PRIVATE
     "${runtime_private}/src/lib/Kernel" "${runtime_private}/src/lib")
 set(boot_private "${CMAKE_CURRENT_BINARY_DIR}/boot-private")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_vu0.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/vu-macro/raw_vsub.cpp")
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_vu0.py"
+    --generated-dir "${YAKUZA_MAIN_GENERATED_DIR}" --out-dir "${boot_private}/vu0-corrections"
+    COMMAND_ERROR_IS_FATAL ANY)
+include("${boot_private}/vu0-corrections/vu0-corrections.cmake")
+if(YAKUZA_VU0_INPUTS)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${YAKUZA_VU0_INPUTS})
+endif()
 set(YAKUZA_BOOT_SUPPLEMENT_DIR "" CACHE PATH "Private translation of newly decoded boot code")
 set(supplement_args)
 if(YAKUZA_BOOT_SUPPLEMENT_DIR)
@@ -77,6 +88,15 @@ add_library(yakuza_boot_overlay_dispatch STATIC src/boot_overlays.cpp)
 target_link_libraries(yakuza_boot_overlay_dispatch PUBLIC yakuza_overlay PRIVATE ps2_runtime)
 file(GLOB boot_generated CONFIGURE_DEPENDS "${YAKUZA_MAIN_GENERATED_DIR}/*.cpp")
 list(REMOVE_ITEM boot_generated "${YAKUZA_MAIN_GENERATED_DIR}/register_functions.cpp")
+# Preserve source order so correcting a helper does not regroup later unity batches.
+foreach(source replacement IN ZIP_LISTS YAKUZA_VU0_INPUTS YAKUZA_VU0_OUTPUTS)
+    list(FIND boot_generated "${source}" position)
+    if(position LESS 0)
+        message(FATAL_ERROR "Verified VU0 source is absent from the boot target")
+    endif()
+    list(REMOVE_AT boot_generated ${position})
+    list(INSERT boot_generated ${position} "${replacement}")
+endforeach()
 add_executable(yakuza_boot_probe tools/boot_probe.cpp src/pal_boot_hooks.cpp
     "${boot_private}/register_boot.cpp" "${boot_private}/boot_supplement.cpp"
     "${boot_private}/register_boot_overlays.cpp" ${boot_generated})
@@ -148,6 +168,13 @@ if(BUILD_TESTING)
     target_link_libraries(boot_vif_tests PRIVATE ps2_runtime)
     target_include_directories(boot_vif_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
     add_test(NAME boot_vif COMMAND boot_vif_tests)
+    add_executable(boot_vu_flags_tests tests/test_boot_vu_flags.cpp
+        "${YAKUZA_VU0_TEST_SOURCE}"
+        tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
+    target_link_libraries(boot_vu_flags_tests PRIVATE ps2_runtime)
+    target_include_directories(boot_vu_flags_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    add_test(NAME boot_vu_flags COMMAND boot_vu_flags_tests)
     add_executable(boot_ipu_tests tests/test_boot_ipu.cpp
         tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
     target_link_libraries(boot_ipu_tests PRIVATE ps2_runtime)

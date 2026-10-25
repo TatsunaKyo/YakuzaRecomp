@@ -27,7 +27,7 @@ jobs:
         run: cmake -S . -B "${{ runner.temp }}/yakuza-boot-host" -A x64 -DYAKUZA_BUILD_BOOT_PROBE=ON -DYAKUZA_MAIN_GENERATED_DIR=${{ github.workspace }}/tests/fixtures/boot-host -DPS2X_ENABLE_FFMPEG=OFF
       - name: Build Windows runtime host
         if: runner.os == 'Windows'
-        run: cmake --build "${{ runner.temp }}/yakuza-boot-host" --config Debug --parallel 2 --target yakuza_boot_probe mmi_permutation_tests boot_dispatch_tests boot_priority_tests boot_resume_tests boot_overlay_tests boot_vif_tests boot_ipu_tests boot_spr_tests
+        run: cmake --build "${{ runner.temp }}/yakuza-boot-host" --config Debug --parallel 2 --target yakuza_boot_probe mmi_permutation_tests boot_dispatch_tests boot_priority_tests boot_resume_tests boot_overlay_tests boot_vif_tests boot_vu_flags_tests boot_ipu_tests boot_spr_tests
       - name: Validate Windows runtime host input handling
         if: runner.os == 'Windows'
         run: ctest --test-dir "${{ runner.temp }}/yakuza-boot-host" -C Debug --output-on-failure -R "^(boot_|mmi_permutations$)"
