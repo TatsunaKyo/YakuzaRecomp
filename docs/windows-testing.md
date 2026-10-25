@@ -1,5 +1,16 @@
 # Windows target and validation
 
+## Experimental native Windows test
+
+[Download the Windows x64 PAL test ZIP](https://github.com/TatsunaKyo/YakuzaRecomp/releases/download/windows-pal-test-20261025/YakuzaRecomp-Windows-PAL-test.zip) (about 64 MiB), or open the [prerelease page](https://github.com/TatsunaKyo/YakuzaRecomp/releases/tag/windows-pal-test-20261025).
+
+Extract every file, double-click `Run-Yakuza.cmd` and select the folder containing your own extracted European/PAL disc files (`SLES_541.71`). Keep the CVM archives intact. Python, a compiler, Linux/WSL and a PS2 BIOS are not required to run this test.
+
+This package is an experimental native host, with original-game Windows execution awaiting player testing. Linux testing reaches title/chapter artwork and textured scenes, with known movie artifacts, slow execution and a later untranslated call. Interactive gameplay, sound and saves remain unverified. The package contains compiled translated code and no original disc data.
+
+The launcher writes `native-test.log` and prints the exit code. Escape or closing the window deliberately stops the probe and may return code 1; inspect the last log lines. The public ZIP was downloaded after publication and its SHA-256 matched `0c112c8ee7e2bd939dfb79503509516b44676b57f15a2747f7e704cd8949f1ad`.
+
+
 The intended game target is Windows 10/11 x64. Linux is an internal development platform. A Linux test pass is never reported as a Windows runtime test.
 
 Current evidence:

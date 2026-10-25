@@ -6,6 +6,8 @@ The goal is to bring the original PS2 game to **Windows 10/11 x64** through stat
 
 **Status: early development. There is no playable game build yet.** The current tools prepare original disc files, analyze game code, test runtime components and build an opt-in full-runtime boot probe. Diagnostic executables are development tools, not the game.
 
+An [experimental Windows PAL test ZIP](https://github.com/TatsunaKyo/YakuzaRecomp/releases/tag/windows-pal-test-20261025) is now available. Extract it, run `Run-Yakuza.cmd` and select your own extracted PAL disc folder. Original-game Windows execution is awaiting player testing; this is an early development test.
+
 This is an unofficial fan project, unaffiliated with SEGA. Original game files are not distributed with this repository.
 
 ## Project credits
@@ -23,7 +25,7 @@ Upstream copyright notices and licenses are retained. See [third-party notices](
 
 The native Linux host boots the original PAL executable, verifies MAIN and GAME in memory, and starts all nine original IOP drivers. The memory-card dialog, title prompt and main menu respond to host input. The title logo and dragon background, Chapter 1 artwork and textured 3D scenes now render. The opening movie and animated caption complete without additional skip input, with known visual corruption still under investigation.
 
-The latest extended replay continues through changing scenes, including buildings and a textured ring. It records no missing translation or CRI error before an explicit diagnostic stop. Dark final frames alternate with brighter intermediate frames; a final screenshot alone does not establish a rendering stall. Execution is slow, and correct rendering, interactive gameplay, sound and saves remain unverified.
+An extended replay continues through changing scenes, including buildings and a textured ring. It records no missing translation or CRI error before an explicit diagnostic stop. A subsequent longer run reaches another untranslated call; further progression remains under development. Dark final frames alternate with brighter intermediate frames; a final screenshot alone does not establish a rendering stall. Execution is slow, and correct rendering, interactive gameplay, sound and saves remain unverified.
 
 The complete original PAL disc is available in private development storage. All 14 root files are verified, every byte of the 42 earlier archive excerpts matches the complete archives, and all 18,685 indexed file extents fit. No further data uploads are currently needed. Original disc data, generated original-game code, private test binaries and download links stay outside this repository.
 
