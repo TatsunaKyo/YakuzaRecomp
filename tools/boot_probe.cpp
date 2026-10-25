@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string_view>
 #include <thread>
@@ -223,7 +224,9 @@ int run(const std::filesystem::path& folder, unsigned seconds, const std::filesy
         throw std::runtime_error("PAL disc folder must contain SLES_541.71 and MAIN.BIN");
     verify_input(folder / "SLES_541.71", 354320, 0x8cc141f490fa8854ULL);
     verify_input(folder / "MAIN.BIN", 4367488, 0xbc3620cf6abcbe29ULL);
-    PS2Runtime runtime;
+    // Keep the large device state off Windows' default 1 MiB host stack.
+    auto runtimeOwner = std::make_unique<PS2Runtime>();
+    auto& runtime = *runtimeOwner;
     runtime.setMissingFunctionPolicy(PS2Runtime::MissingFunctionPolicy::Stop);
     if (!runtime.initialize("YakuzaRecomp | PAL boot development probe")) return 2;
     if (!runtime.loadELF((folder / "SLES_541.71").string())) return 2;
