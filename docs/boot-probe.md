@@ -114,6 +114,8 @@ Direct RPC dispatch could also enter a guest handler between host execution slic
 
 The primary runtime initializes VF0 to the hardware constant `(0,0,0,1)`, but `EeScheduler::startThread` reset new thread contexts through a generic constructor that left VF0.W at zero. The hash-checked private adaptation now initializes that constant after resetting a fresh or restarted thread. It leaves all other initial registers and thread-start behavior unchanged. The display-free thread test checks both starts and restarts, in addition to the existing resume/wakeup ABI checks, and fails against the previous initialization. Both original-code hosts build and the selected native runtime checks pass. The effect on original scene rendering remains under test.
 
+The internal Linux runner waits for the complete newline-terminated Xvfb display notification. Its digits and newline can arrive separately; closing the pipe after just the digits could terminate the display server before the smoke test opened a window. A split-write pipe regression and malformed/closed/timeout cases cover the handshake. Windows uses the regular desktop.
+
 ## Clipping-helper vector flags
 
 The supported translation family contains 199 FMAC instructions and 29 MAC-register reads across 17 helpers. Their emitted arithmetic updated vector values without publishing the flags read by the original branches; two subtract instructions also overwrote read-only VF0. [prepare_vu0.py](../tools/prepare_vu0.py) verifies every complete input fingerprint before producing private corrected copies. It checks the original waits before MAC reads and preserves instruction comments, PCs, branches and source-file ordering in unity builds. Original translations and game instruction bytes remain unchanged.

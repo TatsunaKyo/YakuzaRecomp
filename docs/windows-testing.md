@@ -6,7 +6,7 @@ Current evidence:
 
 | Check | Result |
 | --- | --- |
-| Native Linux build and 61 Python tests | Passed |
+| Native Linux build and 65 Python tests | Passed |
 | Overlay loader swapping, bounds and BSS tests on Linux | Passed |
 | Original 11 overlays loaded into RAM; three translated routines on Linux | 768 cases passed; hardware/constructors/gameplay untested |
 | Four upstream IOP test programs on Linux | Passed |

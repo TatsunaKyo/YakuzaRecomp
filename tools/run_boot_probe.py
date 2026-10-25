@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import select
 import subprocess
+import time
 
 from prepare_game import PAL_INPUTS, read_small, require, sha256
 
@@ -20,6 +21,24 @@ def file_sha256(path):
     with path.open("rb") as binary:
         while chunk := binary.read(1024 * 1024): digest.update(chunk)
     return digest.hexdigest()
+
+
+def read_display_number(read_fd, timeout=10):
+    # Xorg can write the digits and terminating newline separately. Closing
+    # after the first readable byte can make its final write fail with EPIPE.
+    deadline = time.monotonic() + timeout
+    data = b""
+    while not data.endswith(b"\n"):
+        remaining = deadline - time.monotonic()
+        require(remaining > 0, "Virtual display did not start; inspect display.log")
+        ready, _, _ = select.select([read_fd], [], [], remaining)
+        require(bool(ready), "Virtual display did not start; inspect display.log")
+        chunk = os.read(read_fd, 32)
+        require(bool(chunk), "Virtual display failed; inspect display.log")
+        data += chunk
+        require(len(data) <= 32, "Invalid virtual display number; inspect display.log")
+    require(data[:-1].isdigit(), "Invalid virtual display number; inspect display.log")
+    return data[:-1].decode("ascii")
 
 
 def main():
@@ -64,10 +83,7 @@ def main():
                         "-screen", "0", "640x512x24", "-nolisten", "tcp", "-noreset"],
                         pass_fds=(write_fd,), stdout=output, stderr=subprocess.STDOUT)
                 os.close(write_fd); write_fd = -1
-                ready, _, _ = select.select([read_fd], [], [], 10)
-                require(bool(ready), "Virtual display did not start; inspect display.log")
-                display = os.read(read_fd, 100).decode().strip()
-                require(display.isdigit(), "Virtual display failed; inspect display.log")
+                display = read_display_number(read_fd)
                 env["DISPLAY"] = ":" + display
                 env["LIBGL_ALWAYS_SOFTWARE"] = "1"
                 env["XDG_CACHE_HOME"] = str(args.out_dir.resolve() / "cache")
