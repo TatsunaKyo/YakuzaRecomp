@@ -101,4 +101,17 @@ def adapt_flush_interrupts(vif, memory, scheduler):
     }
     const uint32_t timerInterrupts = m_pendingEeTimerInterrupts;
 """)
+    scheduler = once(scheduler, """    case EeEventType::VBlankStart:
+        ++m_vsyncTick;
+""", """    case EeEventType::VBlankStart:
+        // The real scheduled edge also feeds guest code polling INTC_STAT.
+        m_runtime.memory().m_ioRegisters[0x1000F000u] |= (1u << 2);
+        ++m_vsyncTick;
+""")
+    scheduler = once(scheduler, """    case EeEventType::VBlankEnd:
+        dispatchIrq(false, 3u);
+""", """    case EeEventType::VBlankEnd:
+        m_runtime.memory().m_ioRegisters[0x1000F000u] |= (1u << 3);
+        dispatchIrq(false, 3u);
+""")
     return prefix + body, memory, scheduler

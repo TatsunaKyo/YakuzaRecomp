@@ -60,6 +60,19 @@ void vif_driver(uint8_t*, R5900Context* context, PS2Runtime* runtime) {
     context->pc = 0;
     runtime->eeScheduler().requestStop();
 }
+void vblank_status(uint8_t*, R5900Context* context, PS2Runtime* runtime) {
+    auto& memory = runtime->memory();
+    vif_check((memory.read32(0x1000f000) & 0xcu) == 0xcu,
+              "Real VBlank start/end events did not latch INTC status");
+    memory.write32(0x1000f000, 4);
+    vif_check((memory.read32(0x1000f000) & 0xcu) == 8,
+              "VBlank acknowledgement cleared an unrelated pending cause");
+    memory.write32(0x1000f000, 8);
+    vif_check(!(memory.read32(0x1000f000) & 0xcu),
+              "VBlank write-one-to-clear left its acknowledged cause pending");
+    context->pc = 0;
+    runtime->eeScheduler().requestStop();
+}
 }
 int main() {
     PS2Runtime runtime;
@@ -96,5 +109,13 @@ int main() {
     check(interruptRuntime.eeScheduler().addIrqHandler(false, 5, vifHandler, false, 0, 0, stack) > 0);
     interruptRuntime.eeScheduler().setIrqCauseEnabled(false, 5, false);
     interruptRuntime.eeScheduler().run();
+
+    PS2Runtime clockRuntime;
+    check(clockRuntime.memory().initialize());
+    clockRuntime.eeScheduler().reset(clockRuntime.memory().getRDRAM(), irqContext);
+    check(clockRuntime.replaceFunction(entry, vblank_status));
+    clockRuntime.eeScheduler().postEvent(EeEvent{EeEventType::VBlankStart, 0, 0});
+    clockRuntime.eeScheduler().postEvent(EeEvent{EeEventType::VBlankEnd, 0, 0});
+    clockRuntime.eeScheduler().run();
     std::cout << "Recursive yield retains PC/stack; explicit guest return completes the call\n";
 }
