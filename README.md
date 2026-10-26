@@ -6,9 +6,9 @@ The goal is to bring the original PS2 game to **Windows 10/11 x64** through stat
 
 **Status: early development. There is no playable game build yet.** The current tools prepare original disc files, analyze game code, test runtime components and build an opt-in full-runtime boot probe. Diagnostic executables are development tools, not the game.
 
-An [experimental Windows PAL test ZIP](https://github.com/TatsunaKyo/YakuzaRecomp/releases/tag/windows-pal-test-20261025) is available as an initial baseline. That package reports a native stack overflow after reading MAIN.BIN. A subsequent private test with an 8 MiB host stack reaches verified MAIN execution and loads all nine original IOP drivers on Windows 11. With the complete disc folder extracted, the PAL data and all CVM/index lookups succeed. The window still shows black/purple output; Windows rendering and gameplay remain unverified. See [Windows testing](docs/windows-testing.md) for the data layout and current limits.
+Current native Windows tests are shared privately with the maintainer. The latest Windows 11 report confirms visible startup after the GIF correction, with severe slowness, poor responsiveness, artifacts and purple flashes still present. Logs verify MAIN, GAME, all nine original IOP drivers and successful PAL/CVM/index lookups. Interactive gameplay, sound and saves remain unverified. The [older public baseline](https://github.com/TatsunaKyo/YakuzaRecomp/releases/tag/windows-pal-test-20261025) predates the stack and GIF fixes. See [Windows testing](docs/windows-testing.md) for the data layout and current limits.
 
-The blank initial PAL/NTSC selector now has a reproducible cause: the GIF runtime discarded an image header when its pixels arrived in another DMA submission. Retaining that incomplete packet restores the original selector in the Linux framebuffer without early confirm input. A corrected Windows comparison still needs testing.
+The blank initial PAL/NTSC selector had a reproducible cause: the GIF runtime discarded an image header when its pixels arrived in another DMA submission. Retaining that incomplete packet restores the original selector on Linux without early confirm input; the corrected Windows test now also produces visible output. Host presentation additionally avoids waiting on busy GS producer and diagnostic locks, retaining the previous completed frame until another can be captured. This targets window responsiveness; it does not establish a game-speed improvement.
 
 This is an unofficial fan project, unaffiliated with SEGA. Original game files are not distributed with this repository.
 
@@ -35,7 +35,7 @@ The next milestones are:
 
 1. **Reach and validate gameplay.** Follow the original scene sequence and resolve newly observed runtime or translation failures.
 2. **Improve rendering and speed.** Trace the remaining movie artifacts and measure expensive execution paths.
-3. **Continue Windows validation.** Resolve the disc-file lookup failures after verified MAIN execution and all nine IOP driver starts, then compare rendering and input with the Linux host.
+3. **Continue Windows validation.** Compare window responsiveness, rendering and controls with the Linux host after the confirmed startup improvement.
 4. **Validate controls, sound and saves.** Check these features with the original PAL data as gameplay becomes accessible.
 
 There is no release date yet. See [boot development](docs/boot-probe.md), [Windows validation](docs/windows-testing.md) and the [disc collection tools](docs/disc-ranges.md) for the research workflow.

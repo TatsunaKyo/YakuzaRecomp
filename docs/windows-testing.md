@@ -2,7 +2,9 @@
 
 ## Experimental native Windows test
 
-[Download the Windows x64 PAL test ZIP](https://github.com/TatsunaKyo/YakuzaRecomp/releases/download/windows-pal-test-20261025/YakuzaRecomp-Windows-PAL-test.zip) (about 64 MiB), or open the [prerelease page](https://github.com/TatsunaKyo/YakuzaRecomp/releases/tag/windows-pal-test-20261025).
+Current native Windows tests are shared with the maintainer through unpublished draft releases. Sign in with the repository account and use the private release link supplied for that test; download its ZIP under **Assets**. Extract each new test into a separate folder. Private test links and binaries are kept out of this repository.
+
+The [older public baseline](https://github.com/TatsunaKyo/YakuzaRecomp/releases/tag/windows-pal-test-20261025) predates the stack and GIF corrections described below.
 
 Extract every file, double-click `Run-Yakuza.cmd` and select the folder containing your own extracted European/PAL disc files (`SLES_541.71`). Keep the CVM archives intact. Python, a compiler, Linux/WSL and a PS2 BIOS are not required to run this test.
 
@@ -16,7 +18,11 @@ The original Windows comparison used unoptimized runtime components, while the i
 
 The runtime-optimized Windows retest still shows black with purple flashing. Its stopped state is in the original PAL/NTSC selection loop, with the complete original `PAL_NTSC.DAT` present in RAM. A Linux run without early confirm input produces exactly the same 4 MiB of VRAM: the display buffer and its sampled full-screen texture are black. Earlier automated confirmation skipped this initial screen.
 
-Tracing shows IMAGE headers and their pixels arriving in separate PATH3 DMA submissions. The stateless decoder discarded incomplete headers and then interpreted raw pixels as GIF commands, losing palettes and textures. The arbiter now retains partial PATH3 tags and payloads, preserves order within each path, and lets other paths proceed subject to DIRECTHL's IMAGE ordering. Native shortcuts remain blocked while a partial packet is queued. No runtime header/class layout, original instructions or DMA-completion behavior changes. An original-free test fails before the correction and passes afterward, covering all 111 byte splits of a setup/image stream, single-byte delivery, opaque pixel content, interleaved paths and DIRECTHL ordering. All 12 selected Linux runtime checks pass. The original PAL/NTSC selector now renders in the Linux framebuffer with no confirm input; Windows verification remains pending.
+Tracing shows IMAGE headers and their pixels arriving in separate PATH3 DMA submissions. The stateless decoder discarded incomplete headers and then interpreted raw pixels as GIF commands, losing palettes and textures. The arbiter now retains partial PATH3 tags and payloads, preserves order within each path, and lets other paths proceed subject to DIRECTHL's IMAGE ordering. Native shortcuts remain blocked while a partial packet is queued. No runtime header/class layout, original instructions or DMA-completion behavior changes. An original-free test fails before the correction and passes afterward, covering all 111 byte splits of a setup/image stream, single-byte delivery, opaque pixel content, interleaved paths and DIRECTHL ordering. The original PAL/NTSC selector now renders on Linux with no confirm input.
+
+The corrected private GIF test on Windows 11 now starts visibly, according to the maintainer. Severe slowness, poor responsiveness, artifacts and purple flashes remain. Its log verifies MAIN, GAME, nine IOP drivers and all ten PAL/IRX/CVM/index searches; it ends at controller samples without a final runtime status. The supplied exit code is 1, which alone does not establish a crash or a deliberate close. This report confirms a startup improvement, not playable performance or correct graphics.
+
+Linux observation finds host presentation waiting up to about 100 ms on shared GS work, including a second wait solely to record diagnostic history. The host now tries the producer/backend-lifetime locks without waiting, retains the completed frame when busy and skips contended presentation-history entries. Producer rendering and device completion still follow their normal paths. An original-free concurrency regression fails before this change and passes afterward: a held producer or diagnostic snapshot cannot stall frame reuse, a ready frame does not wait for history, and new frames resume after the held work completes. This targets the window's event loop; game speed and Windows responsiveness still need measurement.
 
 Linux testing reaches title/chapter artwork and textured scenes, with known movie artifacts, slow execution and a later untranslated call. Interactive gameplay, sound and saves remain unverified. The package contains compiled translated code and no original disc data.
 
@@ -37,7 +43,7 @@ Current evidence:
 | LLVM-MinGW cross-build of the diagnostic for Windows x64 | Passed |
 | LLVM-MinGW cross-build of overlay tests and translated routine probe | Passed; execution pending |
 | Windows PE inspection | x86-64 console executable; only Windows system/UCRT DLL imports |
-| Original game execution on actual Windows | Private 8 MiB host reaches verified MAIN and starts all nine original IOP drivers on Windows 11; subsequent disc-file lookups fail. Rendering, input and gameplay remain unverified |
+| Original game execution on actual Windows | Private GIF-corrected host reaches verified MAIN/GAME and nine original IOP drivers with all required disc lookups succeeding. Maintainer confirms visible startup, with severe slowness, poor responsiveness, artifacts and purple flashes. Gameplay, sound and saves remain unverified |
 | GitHub Actions Windows/MSVC and Linux default build and tests | Passed for 64425c2; [run](https://github.com/TatsunaKyo/YakuzaRecomp/actions/runs/39945232867) |
 | Full-runtime Windows/MSVC host build and eight host checks | Passed with synthetic code, including IPU block/IDCT, color conversion and scratchpad DMA checks; same CI run |
 | IPU MPEG blocks and RGB32 conversion on Linux and Windows cross-build | Golden pixel and DMA checks pass on Linux; Windows x64 host/test executables cross-build. Original movie playback remains unverified |

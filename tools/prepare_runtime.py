@@ -16,6 +16,7 @@ from prepare_ipu import adapt_ipu, adapt_ipu_faults
 from prepare_spr import adapt_spr
 from prepare_mmi import adapt_mmi, MACROS_SHA256
 from prepare_gif import adapt_path3_gif, GIF_ARBITER_SHA256
+from prepare_presentation import adapt_presentation, GS_FRONTEND_SHA256
 
 HASHES = {
     "Kernel/Syscalls/Helpers/State.h": "88a8a4b4991b87fe052a4d3555facbb355207dd8572eaa1ff978c1fc712bf6c4",
@@ -131,6 +132,7 @@ def main():
         texts["ps2_vif1_interpreter.cpp"], texts["ps2_memory.cpp"], texts["Kernel/EeScheduler.cpp"])
     texts["ps2_memory.cpp"] = adapt_spr(adapt_ipu(texts["ps2_memory.cpp"]))
     texts["gs/ps2_gif_arbiter.cpp"] = adapt_path3_gif((source / "gs/ps2_gif_arbiter.cpp").read_bytes()).decode()
+    texts["gs/gs_frontend.cpp"] = adapt_presentation((source / "gs/gs_frontend.cpp").read_bytes()).decode()
     # Copy the complete include tree so quoted sibling includes and PCHs see
     # the same adapted PS2Memory layout in every translation unit.
     for path in include.rglob("*"):
@@ -155,6 +157,7 @@ def main():
     save(output / "pal_runtime_layout.h", header.encode())
     save(output / "adaptation.json", (json.dumps({"source_sha256": HASHES,
         "gif_arbiter_sha256": GIF_ARBITER_SHA256,
+        "gs_frontend_sha256": GS_FRONTEND_SHA256,
         "memory_header_sha256": MEMORY_HEADER_SHA256, "macros_header_sha256": MACROS_SHA256,
         "layout": layout}, indent=2) + "\n").encode())
     print("Prepared private PAL runtime: heaps, recursive yields, syscall results, VIF and IPU input")
