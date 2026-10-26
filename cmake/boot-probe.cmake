@@ -24,6 +24,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_runtime.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_vif.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_vif_irq.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_gif.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_ipu.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_spr.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_mmi.py"
@@ -179,6 +180,11 @@ if(BUILD_TESTING)
     target_link_libraries(boot_vif_tests PRIVATE ps2_runtime)
     target_include_directories(boot_vif_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
     add_test(NAME boot_vif COMMAND boot_vif_tests)
+    add_executable(boot_gif_tests tests/test_boot_gif.cpp
+        tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
+    target_link_libraries(boot_gif_tests PRIVATE ps2_runtime)
+    target_include_directories(boot_gif_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
+    add_test(NAME boot_gif COMMAND boot_gif_tests)
     add_executable(boot_vu_flags_tests tests/test_boot_vu_flags.cpp
         "${YAKUZA_VU0_TEST_SOURCE}"
         tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
