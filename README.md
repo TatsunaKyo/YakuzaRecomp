@@ -6,7 +6,7 @@ The goal is to bring the original PS2 game to **Windows 10/11 x64** through stat
 
 **Status: early development. There is no playable game build yet.** The current tools prepare original disc files, analyze game code, test runtime components and build an opt-in full-runtime boot probe. Diagnostic executables are development tools, not the game.
 
-An [experimental Windows PAL test ZIP](https://github.com/TatsunaKyo/YakuzaRecomp/releases/tag/windows-pal-test-20261025) is available as an initial baseline. That package reports a native stack overflow after reading MAIN.BIN. A subsequent private test with an 8 MiB host stack reaches verified MAIN execution and loads all nine original IOP drivers on Windows 11. Further progress in that test is blocked by disc-file lookup failures; rendering and gameplay on Windows remain unverified. See [Windows testing](docs/windows-testing.md) for the required data layout.
+An [experimental Windows PAL test ZIP](https://github.com/TatsunaKyo/YakuzaRecomp/releases/tag/windows-pal-test-20261025) is available as an initial baseline. That package reports a native stack overflow after reading MAIN.BIN. A subsequent private test with an 8 MiB host stack reaches verified MAIN execution and loads all nine original IOP drivers on Windows 11. With the complete disc folder extracted, the PAL data and all CVM/index lookups succeed. The window still shows black/purple output; Windows rendering and gameplay remain unverified. See [Windows testing](docs/windows-testing.md) for the data layout and current limits.
 
 This is an unofficial fan project, unaffiliated with SEGA. Original game files are not distributed with this repository.
 

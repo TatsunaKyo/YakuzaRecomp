@@ -11,6 +11,7 @@ if not defined YAKUZA_DISC_DIR (
 )
 set "YAKUZA_DISC_DIR=%YAKUZA_DISC_DIR:"=%"
 > "%~dp0native-test.log" echo [launcher] checking extracted PAL disc files
+>> "%~dp0native-test.log" echo [launcher] started=%DATE% %TIME%
 set "YAKUZA_MISSING_DISC_FILES="
 for %%F in (SYSTEM.CNF SLES_541.71 MAIN.BIN IRX.DAT IOPRP300.IMG PAL_NTSC.DAT OGRE.CVM OGRE2.CVM OGRE3.CVM OGRE4.CVM OGREDIR.BIN OGREDIR2.BIN OGREDIR3.BIN OGREDIR4.BIN) do (
   if not exist "%YAKUZA_DISC_DIR%\%%F" (
@@ -25,10 +26,11 @@ set "YAKUZA_BOOT_DUMP_GS=1"
 echo Starting the test. Press Escape or close the game window to exit.
 echo Output is saved to native-test.log in this folder.
 rem A final dot keeps a trailing directory backslash from escaping its quote.
-"%~dp0YakuzaRecomp-test.exe" "%YAKUZA_DISC_DIR%\." 1800 "%~dp0diagnostics" continue > "%~dp0native-test.log" 2>&1
+"%~dp0YakuzaRecomp-test.exe" "%YAKUZA_DISC_DIR%\." 1800 "%~dp0diagnostics" continue >> "%~dp0native-test.log" 2>&1
 set "YAKUZA_TEST_EXIT_CODE=%ERRORLEVEL%"
 > "%~dp0exit-code.txt" echo %YAKUZA_TEST_EXIT_CODE%
 >> "%~dp0native-test.log" echo [launcher] exit_code=%YAKUZA_TEST_EXIT_CODE%
+>> "%~dp0native-test.log" echo [launcher] finished=%DATE% %TIME%
 echo.
 echo Test exit code: %YAKUZA_TEST_EXIT_CODE%
 echo Open native-test.log for the result and any error.
