@@ -11,6 +11,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -315,6 +316,124 @@ void checkRpcCriticalSection(bool resumable) {
     check(observed[1]==0,"IOP RPC handler preempted a masked guest thread");
     std::cout<<"Known RPC handler waits for the guest critical section; unknown requests leave it alone\n";
 }
+
+constexpr uint32_t queueSid=0xF00D0326u, queueData=base+0x900;
+std::vector<uint8_t> rpcQueueModule(unsigned workerPriority, bool delayHandler, bool stuckHandler=false) {
+    constexpr uint32_t worker=base+0x200, handler=base+0x300, serverThread=base+0x400;
+    constexpr uint32_t threads=base+0x600, sif=base+0x700;
+    constexpr uint32_t descriptor=base+0x940, server=base+0x980, buffer=base+0x9c0, queue=base+0xa00;
+    std::vector<uint8_t> image(0xc00);
+    image[0]=0x7f;image[1]='E';image[2]='L';image[3]='F';image[4]=1;image[5]=1;image[6]=1;
+    put16(image,16,2);put16(image,18,8);put32(image,20,1);put32(image,24,base);put32(image,28,52);
+    put16(image,40,52);put16(image,42,32);put16(image,44,1);
+    put32(image,52,1);put32(image,56,0x100);put32(image,60,base);put32(image,64,base);
+    put32(image,68,0xb00);put32(image,72,0xb00);put32(image,76,7);put32(image,80,4);
+    std::vector<uint32_t> code;
+    const auto emit=[&](uint32_t word){code.push_back(word);};
+    const auto imm=[&](unsigned reg,uint32_t n){emit(0x3c000000u|(reg<<16)|(n>>16));emit(0x34000000u|(reg<<21)|(reg<<16)|(n&0xffff));};
+    const auto call=[&](uint32_t table,unsigned index){emit(0x0c000000u|((table+20+index*8)>>2));emit(0);};
+    const auto write=[&](uint32_t address) {
+        check(code.size()*4<0x200,"Synthetic queued RPC routine overlaps next section");
+        for(size_t i=0;i<code.size();++i)put32(image,0x100+address-base+i*4,code[i]);
+        code.clear();
+    };
+    emit(0x27bdffe0);emit(0xafbf001c);
+    for(auto spec: {std::pair{worker,workerPriority},std::pair{serverThread,30u}}) {
+        imm(8,descriptor);imm(9,spec.first);emit(0xad090008);
+        imm(9,0x1000);emit(0xad09000c);imm(9,spec.second);emit(0xad090010);
+        imm(4,descriptor);call(threads,0);emit(0x00402021);imm(5,0);call(threads,1);
+    }
+    emit(0x8fbf001c);emit(0x27bd0020);emit(0x03e00008);emit(0);write(base);
+    emit(0x27bdfff0);emit(0xafbf000c);imm(4,10);call(threads,3); // Let server enter its RPC loop first.
+    imm(8,queueData);imm(9,1);emit(0xad090000);
+    emit(0x240a0400);emit(0x254affff);emit(0x1540fffe);emit(0); // Split an unmasked work item across host budgets.
+    emit(0x8d090000);emit(0);emit(0xad090004); // Observe whether RPC destroyed the live buffer.
+    imm(9,1);emit(0xad090008);call(threads,4); // Complete, then SleepThread.
+    emit(0x8fbf000c);emit(0x27bd0010);emit(0x03e00008);emit(0);write(worker);
+    emit(0x27bdfff0);emit(0xafbf000c);
+    if(stuckHandler){emit(0x1000ffff);emit(0);}
+    if(delayHandler){imm(4,10);call(threads,3);}
+    call(threads,2);imm(8,queueData);emit(0xad02000c); // GetThreadId must identify registered server.
+    emit(0xad1d0010);emit(0xad000000); // Save real server SP; destroy buffer.
+    emit(0x8d090008);emit(0);emit(0xad090014); // Completion marker at dispatch.
+    emit(0x8d090018);emit(0);emit(0x25290001);emit(0xad090018); // Calls must not re-enter initialization.
+    emit(0x01001021);emit(0x8fbf000c);emit(0x27bd0010);emit(0x03e00008);emit(0);write(handler);
+    emit(0x27bdffe0);emit(0xafbf001c);
+    call(threads,2);emit(0x00402821);imm(4,queue);call(sif,1);
+    imm(4,server);imm(5,queueSid);imm(6,handler);imm(7,buffer);
+    emit(0xafa00010);emit(0xafa00014);imm(8,queue);emit(0xafa80018);call(sif,0);
+    imm(4,queue);call(sif,2); // RpcLoop sleeps until a request.
+    emit(0x8fbf001c);emit(0x27bd0020);emit(0x03e00008);emit(0);write(serverThread);
+    const auto table=[&](uint32_t address,const char* name,const std::vector<unsigned>& ordinals) {
+        const size_t offset=0x100+address-base;put32(image,offset,0x41e00000);put32(image,offset+8,0x00000101);
+        std::memcpy(image.data()+offset+12,name,7);
+        for(size_t i=0;i<ordinals.size();++i){put32(image,offset+20+i*8,0x03e00008);put32(image,offset+24+i*8,0x24000000|ordinals[i]);}
+    };
+    table(threads,"thbase",{4,6,20,33,24});table(sif,"sifcmd",{17,19,22});
+    return image;
+}
+
+void checkRpcQueue(unsigned priority, bool delayHandler) {
+    Host host;IopSubsystem iop(host);const auto image=rpcQueueModule(priority,delayHandler);
+    check(host.writeGuest(0x100,image.data(),image.size()),"Cannot write queued RPC fixture");
+    check(iop.loadModuleBuffer(0x100).startResult==0,"Queued RPC fixture failed to initialize");
+    iop.runEeCycles(4800);
+    check(iop.canBindRpc(queueSid),"Queued RPC server did not reach its loop");
+    std::array<uint32_t,7> before{};check(iop.readMemory(queueData,before.data(),sizeof(before)),"Cannot inspect queued RPC precondition");
+    check(before[0]==1&&before[2]==0,"Queued RPC fixture must stop partway through worker's live buffer use");
+    RpcRequest request{};request.sid=queueSid;request.receive={0xe00,28};
+    check(iop.handleRpc(request).handled,"Queued RPC was not handled");
+    std::array<uint32_t,7> after{};check(host.readGuest(0xe00,after.data(),sizeof(after)),"Cannot inspect queued RPC reply");
+    if(priority<30) {
+        check(after[5]==1&&after[1]==1,"Queued RPC destroyed a buffer before its higher-priority worker finished");
+    } else if(!delayHandler) check(after[5]==0,"Lower-priority worker incorrectly delayed RPC dispatch");
+    check(after[3]==2,"Queued RPC executed outside its registered server thread");
+    check(after[4]>=0x100000&&after[4]<0x1f0000,"Queued RPC did not use the server's allocated stack");
+    check(after[6]==1,"Queued RPC callback did not complete exactly once");
+    check(iop.handleRpc(request).handled,"Second queued RPC was not handled");
+    check(host.readGuest(0xe00,after.data(),sizeof(after))&&after[6]==2&&after[3]==2,"Server did not return to its RPC loop after callback");
+    std::cout<<"Queued RPC follows original thread priority/context and completes after waits; worker priority="<<priority<<", delay="<<delayHandler<<'\n';
+}
+
+
+void checkAutoDmaClock() {
+    using namespace ps2x::iop::detail;
+    IopMemory memory;
+    for(unsigned core=0;core<2;++core) {
+        const uint32_t chcr=core?0x1f801508:0x1f8010c8;
+        const uint32_t admas=core?0x1f9005b0:0x1f9001b0;
+        const auto transfer=[&](uint16_t mode,uint32_t direction) {
+            memory.write16(admas,mode);
+            memory.write32(chcr-4,0x00100020); // 512 32-bit words = 512 stereo PCM16 frames.
+            memory.write32(chcr,0x01000200|direction);
+            const auto dma=memory.takeDmaStart();check(dma.has_value(),"SPU DMA start was lost");return *dma;
+        };
+        check(transfer(0,1).delayCycles==1024,"Ordinary SPU DMA timing changed");
+        check(transfer(uint16_t(core+1),1).delayCycles==393216,"AutoDMA completion ignores 48 kHz stereo consumption");
+        check(transfer(uint16_t(core+1),0).delayCycles==1024,"SPU DMA read incorrectly uses playback clock");
+        check(transfer(uint16_t(core?1:2),1).delayCycles==1024,"Wrong core's AutoDMA bit changes transfer timing");
+    }
+    std::cout<<"Both AutoDMA cores consume stereo PCM16 at 48kHz; ordinary/read DMA paths retain timing\n";
+}
+
+void checkRpcQueueGuard() {
+    Host host;IopSubsystem iop(host);const auto image=rpcQueueModule(60,false,true);
+    check(host.writeGuest(0x100,image.data(),image.size()),"Cannot write stuck queued RPC fixture");
+    check(iop.loadModuleBuffer(0x100).startResult==0,"Stuck queued RPC fixture failed to initialize");
+    iop.runEeCycles(4800);
+    std::array<uint32_t,7> before{},after{};
+    check(iop.readMemory(queueData,before.data(),sizeof(before))&&before[0]==1,"Invalid stuck RPC precondition");
+    RpcRequest request{};request.sid=queueSid;
+    const auto start=iop.debugSnapshot().emulatorInstructions;
+    bool rejected=false;
+    try{(void)iop.handleRpc(request);}
+    catch(const std::runtime_error& error){rejected=std::string(error.what()).find("call budget")!=std::string::npos;}
+    check(rejected,"Nonreturning queued RPC was incorrectly reported complete");
+    check(iop.debugSnapshot().emulatorInstructions-start<=2'000'000,"Queued RPC exceeded existing call guard");
+    check(iop.readMemory(queueData,after.data(),sizeof(after))&&before==after,"RPC guard changed guest markers or forced completion");
+    std::cout<<"Nonreturning queued RPC retains existing call guard and diagnostic guest state\n";
+}
+
 }
 
 int main() {
@@ -336,6 +455,12 @@ int main() {
     checkMaskedTimer(true,true);
     checkMaskedTimer(false,false,true);
     checkMaskedTimer(true,false,true);
+    checkAutoDmaClock();
+    checkRpcQueue(10,false);
+    checkRpcQueue(60,false);
+    checkRpcQueue(10,true);
+    checkRpcQueue(60,true);
+    checkRpcQueueGuard();
     checkRpcCriticalSection(true);
     checkRpcCriticalSection(false);
     std::cout<<"Both sound DMA cores defer masked interrupts and deliver once after outer restore\n";

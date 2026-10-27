@@ -4,6 +4,7 @@ from pathlib import Path
 import argparse
 import hashlib
 import json
+from prepare_iop_rpc import prepare as prepare_rpc
 
 SOURCE_SHA256 = "01deb410d04f441be12adc68638846061f19759e007c36cdfcbe987796199d36"
 KERNEL_SHA256 = "203c9949793be35f30583612db855544356d1ec1124b96fdf9377e4d321c1002"
@@ -80,14 +81,27 @@ def main():
         b"            // A host time slice is not a guest interrupt or a voluntary wait.\n"
         b"            if (m_memory.interruptControl() == 0u && !thread.cpu.yielded)\n                return;\n"
         b"            thread.state = IopThreadState::Ready;\n        }")
+    try:
+        rpc_files = prepare_rpc(source_dir, adapted, kernel)
+    except ValueError as error:
+        parser.error(str(error))
+    # Every implementation uses the same private headers, including the RPC
+    # executor interface. Mixing old/new virtual layouts is unsafe.
+    copies = {path.relative_to(source_dir): path.read_bytes().replace(b"\r\n", b"\n")
+              for path in (source_dir / "src").rglob("*")
+              if path.is_file() and path.suffix in (".cpp", ".h")}
+    copies.update({Path("src") / name: content for name, content in rpc_files.items()})
     output.mkdir(parents=True, exist_ok=True)
-    for name, content in (("iop_emulator.cpp", adapted), ("iop_kernel.cpp", kernel)):
+    for name, content in copies.items():
         target = output / name
+        target.parent.mkdir(parents=True, exist_ok=True)
         if not target.exists() or target.read_bytes() != content:
             target.write_bytes(content)
-    report = {"source_sha256": SOURCE_SHA256, "adapted_sha256": hashlib.sha256(adapted).hexdigest(),
-              "kernel_sha256": KERNEL_SHA256, "adapted_kernel_sha256": hashlib.sha256(kernel).hexdigest(),
-              "policy": "Preserve IOP critical sections across host slices, callbacks and RPC; consume import loads"}
+    report = {"source_sha256": SOURCE_SHA256, "adapted_sha256": hashlib.sha256(rpc_files["emulator/iop_emulator.cpp"]).hexdigest(),
+              "kernel_sha256": KERNEL_SHA256, "adapted_kernel_sha256": hashlib.sha256(rpc_files["emulator/core/iop_kernel.cpp"]).hexdigest(),
+              "policy": "Preserve critical sections and import loads; schedule RPC in its server thread; clock PCM16 AutoDMA consumption",
+              "private_source_tree": "src",
+              "private_files": {str(name): hashlib.sha256(content).hexdigest() for name, content in copies.items()}}
     (output / "adaptation.json").write_text(json.dumps(report, indent=2) + "\n")
     print("Prepared private IOP interrupt and critical-section adaptations")
 
