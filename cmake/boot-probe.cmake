@@ -158,6 +158,7 @@ if(WIN32)
         target_link_options(yakuza_boot_probe PRIVATE "/STACK:8388608")
     endif()
 endif()
+include("${CMAKE_CURRENT_LIST_DIR}/emitted-mmi.cmake")
 if(BUILD_TESTING)
     # Exercise the exact copied header used by translated code in this build.
     target_include_directories(mmi_permutation_tests BEFORE PRIVATE "${runtime_private}/include")
@@ -191,6 +192,9 @@ if(BUILD_TESTING)
     target_link_libraries(boot_presentation_tests PRIVATE ps2_runtime)
     target_include_directories(boot_presentation_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
     add_test(NAME boot_presentation COMMAND boot_presentation_tests)
+    add_executable(boot_mmi_emission_tests tests/test_boot_mmi_emission.cpp "${YAKUZA_EMITTED_MMI_TEST_SOURCE}")
+    target_link_libraries(boot_mmi_emission_tests PRIVATE ps2_runtime)
+    add_test(NAME boot_mmi_emission COMMAND boot_mmi_emission_tests)
     add_executable(boot_vu_flags_tests tests/test_boot_vu_flags.cpp
         "${YAKUZA_VU0_TEST_SOURCE}"
         tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)

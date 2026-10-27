@@ -10,6 +10,8 @@ Current native Windows tests are shared privately with the maintainer. The lates
 
 The blank initial PAL/NTSC selector had a reproducible cause: the GIF runtime discarded an image header when its pixels arrived in another DMA submission. Retaining that incomplete packet restores the original selector on Linux without early confirm input; the corrected Windows test now also produces visible output. Host presentation additionally avoids waiting on busy GS producer and diagnostic locks, retaining the previous completed frame until another can be captured. This targets window responsiveness; it does not establish a game-speed improvement.
 
+Generated code also bypassed the corrected runtime macros at 69 inline PEXEH/PROT3W sites. Private compilation copies now route those operations through the verified lane permutations, preserving the original instructions and generated inputs. An original-free test of actual recompiler output fails before this correction and passes afterward. Any improvement to the remaining visual artifacts still needs original-game testing.
+
 This is an unofficial fan project, unaffiliated with SEGA. Original game files are not distributed with this repository.
 
 ## Project credits
