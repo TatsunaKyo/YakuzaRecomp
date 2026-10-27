@@ -56,7 +56,7 @@ void put16(std::vector<uint8_t>& b, size_t o, uint16_t n) { b[o]=uint8_t(n); b[o
 void put32(std::vector<uint8_t>& b, size_t o, uint32_t n) { for(unsigned i=0;i<4;++i)b[o+i]=uint8_t(n>>(8*i)); }
 constexpr uint32_t base=0x10000, handler=base+0x200, imports=base+0x300, data=base+0x400;
 
-std::vector<uint8_t> module(unsigned core, bool nested) {
+std::vector<uint8_t> module(unsigned core, bool nested, bool autoDma=false) {
     std::vector<uint8_t> image(0x600);
     image[0]=0x7f; image[1]='E'; image[2]='L'; image[3]='F'; image[4]=1; image[5]=1; image[6]=1;
     put16(image,16,2); put16(image,18,8); put32(image,20,1); put32(image,24,base); put32(image,28,52);
@@ -72,11 +72,12 @@ std::vector<uint8_t> module(unsigned core, bool nested) {
     emit(0x27bdfff0); emit(0xafbf000c);
     imm(4,core?0x28:0x24); imm(5,1); imm(6,handler); imm(7,data); call(0); // RegisterIntrHandler
     imm(4,core?0x28:0x24); call(1); // EnableIntr
+    if(autoDma){imm(8,core?0x1f9005b0:0x1f9001b0);imm(9,core+1);emit(0xa5090000);}
     if(nested) {
         imm(4,data+12);call(4); // CpuSuspendIntr saves enabled state
         imm(4,data+16);call(4); // Nested suspend saves disabled state
     } else call(2); // CpuDisableIntr
-    imm(8,core?0x1f801504:0x1f8010c4);imm(9,0x00010020);emit(0xad090000); // BCR: 32 words
+    imm(8,core?0x1f801504:0x1f8010c4);imm(9,autoDma?0x00100020:0x00010020);emit(0xad090000);
     imm(9,0x01000201);emit(0xad090004); // Start sound DMA; completion becomes pending while masked
     pause();sample(4);
     if(nested) {
@@ -146,7 +147,8 @@ void checkCriticalSectionAcrossSlices() {
 
 // Phase 0 arms a one-shot timer and masks interrupts. Later modules restore
 // the inner/outer saved mask without replacing the first module's counter.
-std::vector<uint8_t> timerModule(bool nested, unsigned phase, bool delayedArgument=false, bool disc=false) {
+std::vector<uint8_t> timerModule(bool nested, unsigned phase, bool delayedArgument=false, bool disc=false,
+                               unsigned ticks=100, bool masked=true) {
     const uint32_t load=base+phase*0x1000, timerImports=load+0x300, intrImports=load+0x380;
     std::vector<uint8_t> image(0x600);
     image[0]=0x7f;image[1]='E';image[2]='L';image[3]='F';image[4]=1;image[5]=1;image[6]=1;
@@ -167,14 +169,14 @@ std::vector<uint8_t> timerModule(bool nested, unsigned phase, bool delayedArgume
         } else {
         imm(4,1);imm(5,32);imm(6,1);call(timerImports,0); // AllocHardTimer SYSCLK/32-bit
         emit(0x00408021); // Keep the allocated timer ID in s0.
-        emit(0x02002021);imm(5,100);imm(6,handler);imm(7,data);call(timerImports,1);
+        emit(0x02002021);imm(5,ticks);imm(6,handler);imm(7,data);call(timerImports,1);
         emit(0x02002021);imm(5,1);imm(6,0);imm(7,1);call(timerImports,2); // SetupHardTimer
         emit(0x02002021);call(timerImports,3); // StartHardTimer
         }
         if(nested) {
             imm(4,data+12);call(intrImports,2); // Outer CpuSuspendIntr
             imm(4,data+16);call(intrImports,2); // Inner CpuSuspendIntr
-        } else call(intrImports,0); // CpuDisableIntr
+        } else if(masked) call(intrImports,0); // CpuDisableIntr
     } else if(nested) {
         imm(8,data);
         if(delayedArgument) {
@@ -460,6 +462,39 @@ void checkRpcReturnBoundary() {
     std::cout<<"RPC return checked in its own context; a later masked worker still blocks new RPC\n";
 }
 
+void checkIdleEvents() {
+    // Repeated tiny EE budgets must not postpone a future event while no IOP
+    // thread is runnable. Check timer, both AutoDMA cores, then a new RPC.
+    for(unsigned kind=0;kind<3;++kind) {
+        Host host;IopSubsystem iop(host);
+        const auto image=kind==0?timerModule(false,0,false,false,1'000'000,false):module(kind-1,false,true);
+        check(host.writeGuest(0x100,image.data(),image.size()),"Cannot write idle event fixture");
+        check(iop.loadModuleBuffer(0x100).startResult==0,"Idle event fixture failed to initialize");
+        const auto count=[&](){uint32_t value=0;check(iop.readMemory(data,&value,sizeof(value)),"Cannot read idle event counter");return value;};
+        check(count()==0,"Idle event fired during initialization");
+        for(unsigned n=0;n<25'000;++n)iop.runEeCycles(80);
+        check(count()==0,"Idle event fired before its deadline");
+        for(unsigned n=0;n<150'000;++n)iop.runEeCycles(80);
+        check(count()==1,"Idle deadline lost or repeated a timer/DMA callback");
+        for(unsigned n=0;n<25'000;++n)iop.runEeCycles(80);
+        check(count()==1,"One-shot idle event repeated");
+    }
+    Host host;IopSubsystem iop(host);const auto image=rpcQueueModule(60,false);
+    check(host.writeGuest(0x100,image.data(),image.size()),"Cannot write idle RPC fixture");
+    check(iop.loadModuleBuffer(0x100).startResult==0,"Idle RPC fixture failed to initialize");
+    iop.runEeCycles(100'000);
+    const auto before=iop.debugSnapshot();
+    for(unsigned n=0;n<25'000;++n)iop.runEeCycles(80);
+    const auto after=iop.debugSnapshot();
+    check(after.emulatorInstructions==before.emulatorInstructions,"Sleeping IOP executed guest instructions");
+    check(after.emulatorCycles==before.emulatorCycles+250'000,"Idle scheduler changed the requested time budget");
+    RpcRequest request{};request.sid=queueSid;request.receive={0xe00,28};
+    check(iop.handleRpc(request).handled,"New RPC remained blocked behind an old idle deadline");
+    std::array<uint32_t,7> reply{};
+    check(host.readGuest(0xe00,reply.data(),sizeof(reply))&&reply[3]==2&&reply[6]==1,"RPC wake lost its real server context");
+    std::cout<<"Idle time budgets preserve timer/DMA deadlines, one-shot delivery and later RPC wakeup\n";
+}
+
 }
 
 int main() {
@@ -488,6 +523,7 @@ int main() {
     checkRpcQueue(60,true);
     checkRpcQueueGuard();
     checkRpcReturnBoundary();
+    checkIdleEvents();
     checkRpcCriticalSection(true);
     checkRpcCriticalSection(false);
     std::cout<<"Both sound DMA cores defer masked interrupts and deliver once after outer restore\n";

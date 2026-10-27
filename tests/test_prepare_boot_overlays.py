@@ -48,6 +48,43 @@ def translated_fixture(folder):
 
 
 class BootOverlayPreparationTests(unittest.TestCase):
+    def link_source(self, link, target):
+        try:
+            link.symlink_to(target)
+        except OSError as error:
+            if sys.platform == "win32" and getattr(error, "winerror", None) == 1314:
+                self.skipTest("Windows account cannot create symbolic links")
+            raise
+
+    def test_reused_translation_retains_its_physical_source_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            folder = translated_fixture(root / "game")
+            current = folder / "generated/original.cpp"
+            original = root / "previous/original.cpp"
+            original.parent.mkdir()
+            current.rename(original)
+            self.link_source(current, original)
+            before = original.read_bytes()
+            prepare([folder], root / "bindings")
+            cmake = (root / "bindings/boot_overlays.cmake").read_text()
+            self.assertIn(original.as_posix(), cmake)
+            self.assertNotIn(current.as_posix(), cmake)
+            self.assertEqual(original.read_bytes(), before)
+
+    def test_distinct_overlay_symbols_cannot_alias_one_physical_source(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            folder = translated_fixture(root / "game")
+            generated = folder / "generated"
+            self.link_source(generated / "other.cpp", generated / "original.cpp")
+            register = generated / "register_functions.cpp"
+            with register.open("a") as output:
+                output.write(f"g_ps2RecompiledFunctionTable[1] = other; // {SLOT_START + 132:#x}\n")
+            with self.assertRaisesRegex(FormatError, "same translation source"):
+                prepare([folder], root / "bindings")
+            self.assertFalse((root / "bindings").exists())
+
     def test_sparse_binding_preserves_inputs_and_canonical_unicode_paths(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 from prepare_iop_rpc import prepare as prepare_rpc
+from prepare_iop_idle import adapt_idle
 
 SOURCE_SHA256 = "01deb410d04f441be12adc68638846061f19759e007c36cdfcbe987796199d36"
 KERNEL_SHA256 = "203c9949793be35f30583612db855544356d1ec1124b96fdf9377e4d321c1002"
@@ -83,6 +84,7 @@ def main():
         b"            thread.state = IopThreadState::Ready;\n        }")
     try:
         rpc_files = prepare_rpc(source_dir, adapted, kernel)
+        rpc_files["emulator/iop_emulator.cpp"] = adapt_idle(rpc_files["emulator/iop_emulator.cpp"])
     except ValueError as error:
         parser.error(str(error))
     # Every implementation uses the same private headers, including the RPC
@@ -99,7 +101,7 @@ def main():
             target.write_bytes(content)
     report = {"source_sha256": SOURCE_SHA256, "adapted_sha256": hashlib.sha256(rpc_files["emulator/iop_emulator.cpp"]).hexdigest(),
               "kernel_sha256": KERNEL_SHA256, "adapted_kernel_sha256": hashlib.sha256(rpc_files["emulator/core/iop_kernel.cpp"]).hexdigest(),
-              "policy": "Preserve critical sections and import loads; schedule RPC in its server thread; clock PCM16 AutoDMA consumption",
+              "policy": "Preserve critical sections and import loads; schedule RPC in its server thread; clock PCM16 AutoDMA consumption; cache only idle event deadlines",
               "private_source_tree": "src",
               "private_files": {str(name): hashlib.sha256(content).hexdigest() for name, content in copies.items()}}
     (output / "adaptation.json").write_text(json.dumps(report, indent=2) + "\n")

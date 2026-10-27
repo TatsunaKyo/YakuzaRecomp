@@ -52,7 +52,12 @@ def module(folder):
     require(bool(entries) and len(entries) == len(assignments), "Unrecognized overlay registration")
     require(all(not ctor or ctor in entries for ctor in layout["constructors"]),
             "Original overlay constructor has no exact registration")
-    return layout, sorted(entries.items()), sorted(folder / (name + ".cpp") for name in symbols), fnv(image)
+    # Later private analyses can reuse byte-identical earlier translations.
+    # Keep physical paths stable so adding methods does not rebuild/regroup all
+    # existing unity batches. Each reused file keeps its own declarations.
+    files = [path.resolve(strict=True) for path in sorted(folder / (name + ".cpp") for name in symbols)]
+    require(len(set(files)) == len(files), "Overlay symbols alias the same translation source")
+    return layout, sorted(entries.items()), files, fnv(image)
 
 
 def write_changed(path, text):
@@ -90,7 +95,11 @@ def prepare(folders, output):
         cmake += f'set_target_properties({target} PROPERTIES UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE 16)\n'
         cmake += f'if(WIN32)\n target_compile_definitions({target} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)\nendif()\n'
         for path in files:
-            if path.stat().st_size > 524288:
+            if path.parent != files[0].parent:
+                cmake += (f'set_source_files_properties({cmake_path(path)} PROPERTIES '
+                          f'SKIP_UNITY_BUILD_INCLUSION ON SKIP_PRECOMPILE_HEADERS ON '
+                          f'INCLUDE_DIRECTORIES {cmake_path(path.parent)})\n')
+            elif path.stat().st_size > 524288:
                 cmake += f'set_source_files_properties({cmake_path(path)} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)\n'
         cmake += f'list(APPEND YAKUZA_BOOT_OVERLAY_TARGETS {target})\n'
         report.append({"module": layout["name"], "id": layout["module_id"], "sources": len(files),

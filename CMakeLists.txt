@@ -19,6 +19,7 @@ find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 set(iop_private "${CMAKE_CURRENT_BINARY_DIR}/iop-private")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_iop.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_iop_idle.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_iop_rpc.py")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_iop.py"
     --iop-dir "${ps2recomp_SOURCE_DIR}/ps2xIOP" --out-dir "${iop_private}"

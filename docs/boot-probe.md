@@ -4,6 +4,8 @@ The opt-in `yakuza_boot_probe` target links the verified resident/MAIN translati
 
 Original disc files and generated game source remain outside the repository. The default build does not fetch graphics dependencies or compile game code. Enable this target only when private verified translations are available.
 
+The latest Windows stability log identifies an indirect-call failure at `0x29f568 -> 0x636660`. The target is an original GAME method referenced by shared class tables. A fresh GAME analysis verifies 224 previously missing method targets in that bounded table area, fingerprints their original bytes, checks that they do not overlap existing functions, and translates them normally. It preserves all 1,750 earlier C++ sources and 94,618 callable entries. The updated module contains 1,983 decoded ranges, 143,090 instructions and 95,309 callable entries, with zero generation errors or unhandled instructions and 1,304 unresolved control-flow warnings. Both hosts build. Actual translated methods at `0x636660` and `0x636650` pass 56 checks against original return, signed-load/delay-slot and CPU/RAM behavior. Registration and these small-method checks do not establish complete gameplay or Windows stability.
+
 ## Windows development build
 
 With Visual Studio 2022's C++ workload, Git, Python 3.10+ and CMake installed, use a developer PowerShell:
@@ -12,8 +14,8 @@ With Visual Studio 2022's C++ workload, Git, Python 3.10+ and CMake installed, u
 cmake -S . -B "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" -A x64 `
   -DYAKUZA_BUILD_BOOT_PROBE=ON `
   -DYAKUZA_MAIN_GENERATED_DIR="D:\Yakuza Research\generated-pal-probe" `
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v57\generated" `
-  -DYAKUZA_BOOT_OVERLAY_DIRS="D:\Yakuza Research\overlay-analysis-boot-v3\game" `
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR="D:\Yakuza Research\boot-supplement-v63\generated" `
+  -DYAKUZA_BOOT_OVERLAY_DIRS="D:\Yakuza Research\overlay-analysis-boot-v4\game" `
   -DPS2X_ENABLE_FFMPEG=OFF
 cmake --build "$env:LOCALAPPDATA\YakuzaRecomp\boot-build" --config Debug --parallel 2 --target yakuza_boot_probe
 & "$env:LOCALAPPDATA\YakuzaRecomp\boot-build\Debug\yakuza_boot_probe.exe" "D:\Yakuza PAL" 15 "$env:LOCALAPPDATA\YakuzaRecomp\boot-state"
@@ -23,7 +25,7 @@ The generated directories must contain the real verified resident/MAIN `.cpp` fi
 
 Append `continue` after the state folder to execute MAIN's body. A continued run has no success completion condition yet and returns nonzero when stopped. Reaching MAIN and completing a playable boot are separate results.
 
-For incremental research builds, supplemental source links resolve to their physical files and use those files' own declaration headers. A privately prepared new generation can share earlier files after verifying identical C++ bytes, unchanged common header content and stub declarations, and retention of every earlier function declaration. The original instruction map and callable-entry checks still run for the new generation. Generate into a fresh directory before preparing links; do not regenerate into a directory containing linked earlier sources. The first such Linux and Windows builds compile three C++ units: the two new methods and registration, retaining the 402 earlier compiled translations.
+For incremental research builds, supplemental and overlay source links resolve to their physical files and use those files' own declaration headers. A privately prepared new generation can share earlier files after verifying identical C++ bytes, unchanged common header content and stub declarations, and retention of every earlier function declaration. The original instruction map and callable-entry checks still run for the new generation. New overlay files outside the canonical source directory compile separately with their own declarations, preserving earlier unity batches. Duplicate physical sources are rejected. Generate into a fresh directory before preparing links; do not regenerate into a directory containing linked earlier sources. The first supplemental reuse builds compiled three C++ units: the two new methods and registration, retaining the 402 earlier compiled translations.
 
 The initial Windows cross-build disables FFmpeg video decoding explicitly. This limits media behavior and is not a completed video implementation. The native Linux development build enables system FFmpeg. Full gameplay graphics, audio and controls remain unverified.
 
@@ -41,8 +43,8 @@ cmake -S . -B /workspace/scratch/yakuza-pal/boot-build -G Ninja \
   -DCMAKE_PREFIX_PATH=/workspace/.cache/yakuza-onboarding/desktop-sdk/root/usr \
   -DYAKUZA_BUILD_BOOT_PROBE=ON \
   -DYAKUZA_MAIN_GENERATED_DIR=/workspace/scratch/yakuza-pal/generated-pal-probe \
-  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v57/generated \
-  -DYAKUZA_BOOT_OVERLAY_DIRS=/workspace/scratch/yakuza-pal/overlay-analysis-boot-v3/game
+  -DYAKUZA_BOOT_SUPPLEMENT_DIR=/workspace/scratch/yakuza-pal/boot-supplement-v63/generated \
+  -DYAKUZA_BOOT_OVERLAY_DIRS=/workspace/scratch/yakuza-pal/overlay-analysis-boot-v4/game
 cmake --build /workspace/scratch/yakuza-pal/boot-build --target yakuza_boot_probe --parallel 2
 python tools/run_boot_probe.py \
   --exe /workspace/scratch/yakuza-pal/boot-build/yakuza_boot_probe \
@@ -119,6 +121,10 @@ The RPC bridge previously ignored `SetRpcQueue`'s server-thread ID. It now retai
 Normal scheduling also exposes over-frequent sound interrupts: the game enables AutoDMA, while the pinned device applies ordinary bus-transfer timing to its input buffers. For stereo PCM16, one 32-bit word is a stereo frame; at 48 kHz and a 36.864 MHz IOP clock, each consumes 768 IOP cycles. The private device now uses that consumption interval for AutoDMA writes on the selected core. Ordinary DMA, reads and the other core's enable bit retain their previous timing. This covers the observed PCM16 mode, not complete SPU2 emulation or verified audio output.
 
 The original-free IOP regression reproduces buffer destruction before a higher-priority worker completes. It checks both priority orders, the real server-thread ID and stack, callback waits, successive calls, and a stuck callback that must retain the two-million-instruction guard without altering guest markers. A return-boundary case also verifies that a completed callback is checked before another worker can enter its own masked section; that worker still blocks later RPC requests normally. Separate timing checks cover AutoDMA on both cores and unchanged ordinary/read paths. All private IOP sources use one coherent header tree, including the extended executor interface; pinned upstream sources and original game data remain unchanged. Original-game Windows validation remains separate.
+
+## Idle IOP scheduling
+
+When no IOP thread is runnable, the private scheduler caches the earliest delayed-thread, DMA, guest-callback or timer deadline. Repeated small EE budgets can advance idle time up to that deadline without repeatedly scanning every queue. New guest calls, queued RPC work and public memory writes invalidate the cache; masked critical sections retain the normal scheduler path. Synthetic tests check future timer and AutoDMA deadlines, one-shot delivery, exact idle cycle budgets and subsequent RPC wakeup in its real server context. This reduces idle-scheduler overhead, not the cost of rendering or runnable guest execution; no game frame-rate gain is established.
 
 ## EE thread vector constants
 
