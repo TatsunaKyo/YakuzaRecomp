@@ -68,8 +68,8 @@ class BootOverlayPreparationTests(unittest.TestCase):
             before = original.read_bytes()
             prepare([folder], root / "bindings")
             cmake = (root / "bindings/boot_overlays.cmake").read_text()
-            self.assertIn(original.as_posix(), cmake)
-            self.assertNotIn(current.as_posix(), cmake)
+            self.assertIn(original.resolve().as_posix(), cmake)
+            self.assertNotIn((current.parent.resolve() / current.name).as_posix(), cmake)
             self.assertEqual(original.read_bytes(), before)
 
     def test_distinct_overlay_symbols_cannot_alias_one_physical_source(self):
