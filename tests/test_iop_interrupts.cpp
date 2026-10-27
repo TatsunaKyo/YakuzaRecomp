@@ -318,9 +318,10 @@ void checkRpcCriticalSection(bool resumable) {
 }
 
 constexpr uint32_t queueSid=0xF00D0326u, queueData=base+0x900;
-std::vector<uint8_t> rpcQueueModule(unsigned workerPriority, bool delayHandler, bool stuckHandler=false) {
+std::vector<uint8_t> rpcQueueModule(unsigned workerPriority, bool delayHandler, bool stuckHandler=false,
+                                   bool maskAfterRpc=false) {
     constexpr uint32_t worker=base+0x200, handler=base+0x300, serverThread=base+0x400;
-    constexpr uint32_t threads=base+0x600, sif=base+0x700;
+    constexpr uint32_t threads=base+0x600, sif=base+0x700, intr=base+0x800;
     constexpr uint32_t descriptor=base+0x940, server=base+0x980, buffer=base+0x9c0, queue=base+0xa00;
     std::vector<uint8_t> image(0xc00);
     image[0]=0x7f;image[1]='E';image[2]='L';image[3]='F';image[4]=1;image[5]=1;image[6]=1;
@@ -346,10 +347,16 @@ std::vector<uint8_t> rpcQueueModule(unsigned workerPriority, bool delayHandler, 
     emit(0x8fbf001c);emit(0x27bd0020);emit(0x03e00008);emit(0);write(base);
     emit(0x27bdfff0);emit(0xafbf000c);imm(4,10);call(threads,3); // Let server enter its RPC loop first.
     imm(8,queueData);imm(9,1);emit(0xad090000);
-    emit(0x240a0400);emit(0x254affff);emit(0x1540fffe);emit(0); // Split an unmasked work item across host budgets.
+    emit(0x240a0400);
+    const size_t workLoop=code.size();
+    size_t maskBranch=0;
+    if(maskAfterRpc){emit(0x8d090000);emit(0);maskBranch=code.size();emit(0);emit(0);}
+    emit(0x254affff);emit(0x15400000u|uint16_t(int(workLoop)-int(code.size())-1));emit(0);
     emit(0x8d090000);emit(0);emit(0xad090004); // Observe whether RPC destroyed the live buffer.
     imm(9,1);emit(0xad090008);call(threads,4); // Complete, then SleepThread.
-    emit(0x8fbf000c);emit(0x27bd0010);emit(0x03e00008);emit(0);write(worker);
+    emit(0x8fbf000c);emit(0x27bd0010);emit(0x03e00008);emit(0);
+    if(maskAfterRpc){code[maskBranch]=0x11200000u|uint16_t(int(code.size())-int(maskBranch)-1);call(intr,0);emit(0x1000ffff);emit(0);}
+    write(worker);
     emit(0x27bdfff0);emit(0xafbf000c);
     if(stuckHandler){emit(0x1000ffff);emit(0);}
     if(delayHandler){imm(4,10);call(threads,3);}
@@ -369,7 +376,7 @@ std::vector<uint8_t> rpcQueueModule(unsigned workerPriority, bool delayHandler, 
         std::memcpy(image.data()+offset+12,name,7);
         for(size_t i=0;i<ordinals.size();++i){put32(image,offset+20+i*8,0x03e00008);put32(image,offset+24+i*8,0x24000000|ordinals[i]);}
     };
-    table(threads,"thbase",{4,6,20,33,24});table(sif,"sifcmd",{17,19,22});
+    table(threads,"thbase",{4,6,20,33,24});table(sif,"sifcmd",{17,19,22});table(intr,"intrman",{8});
     return image;
 }
 
@@ -434,6 +441,25 @@ void checkRpcQueueGuard() {
     std::cout<<"Nonreturning queued RPC retains existing call guard and diagnostic guest state\n";
 }
 
+void checkRpcReturnBoundary() {
+    Host host;IopSubsystem iop(host);const auto image=rpcQueueModule(60,false,false,true);
+    check(host.writeGuest(0x100,image.data(),image.size()),"Cannot write RPC return-boundary fixture");
+    check(iop.loadModuleBuffer(0x100).startResult==0,"RPC return-boundary fixture failed to initialize");
+    iop.runEeCycles(4800);
+    RpcRequest request{};request.sid=queueSid;request.receive={0xe00,28};
+    check(iop.handleRpc(request).handled,"Completed RPC was blamed for another worker's masked section");
+    std::array<uint32_t,7> reply{};
+    check(host.readGuest(0xe00,reply.data(),sizeof(reply))&&reply[6]==1,"RPC did not return before unrelated worker execution");
+    // That worker really can mask interrupts after this reply. It must still
+    // block a later RPC, without retroactively failing the completed callback.
+    iop.runEeCycles(4800);
+    bool rejected=false;
+    try{(void)iop.handleRpc(request);}
+    catch(const std::runtime_error& error){rejected=std::string(error.what()).find("critical section")!=std::string::npos;}
+    check(rejected,"Later RPC bypassed the other worker's real critical section");
+    std::cout<<"RPC return checked in its own context; a later masked worker still blocks new RPC\n";
+}
+
 }
 
 int main() {
@@ -461,6 +487,7 @@ int main() {
     checkRpcQueue(10,true);
     checkRpcQueue(60,true);
     checkRpcQueueGuard();
+    checkRpcReturnBoundary();
     checkRpcCriticalSection(true);
     checkRpcCriticalSection(false);
     std::cout<<"Both sound DMA cores defer masked interrupts and deliver once after outer restore\n";

@@ -47,7 +47,7 @@ RPC_EXECUTION = b'''
                 const uint64_t remaining = std::min<uint64_t>(
                     kMaxCallInstructions - (totalInstructions - startInstructions),
                     kMaxCallInstructions - (totalCycles - startCycles));
-                runCycles(std::min<uint64_t>(kDefaultSlice, remaining));
+                runCycles(std::min<uint64_t>(kDefaultSlice, remaining), &thread->cpu);
                 if (kernel.findThread(threadId) != thread)
                     throw std::runtime_error("IOP RPC server thread was deleted during dispatch");
             };
@@ -142,6 +142,15 @@ def prepare(source_dir, emulator, kernel):
         b"            std::max<uint64_t>(transferWords * 2u, 64u),", b"            delay,")
     emulator = replace_once(emulator, b"        uint32_t executeGuestFunctionWithBudget(",
         RPC_EXECUTION + b"\n        uint32_t executeGuestFunctionWithBudget(")
+    emulator = replace_once(emulator, b"        void runCycles(uint64_t cycles) noexcept",
+        b"        void runCycles(uint64_t cycles, const CpuState *stopOnReturn = nullptr) noexcept")
+    emulator = replace_once(emulator,
+        b"                    kernel.endTimeslice(*next, kThreadReturnSentinel);",
+        b"                    kernel.endTimeslice(*next, kThreadReturnSentinel);\n"
+        b"                    // Observe the RPC return before another worker can enter\n"
+        b"                    // its own masked section in the rest of this host slice.\n"
+        b"                    if (&next->cpu == stopOnReturn && next->cpu.pc == kCallReturnSentinel)\n"
+        b"                        break;")
     files["emulator/iop_emulator.cpp"] = emulator
     files["emulator/core/iop_kernel.cpp"] = kernel
     return files
