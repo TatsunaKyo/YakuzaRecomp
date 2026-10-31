@@ -34,6 +34,8 @@ The full boot host uses a separate `BootOverlayDispatch` adapter at the original
 
 Set `YAKUZA_BOOT_OVERLAY_DIRS` to verified private analysis directories (separated by semicolons) when configuring the [full boot host](boot-probe.md). Each module is compiled separately, and only the matching active module's entries are registered. The current host includes GAME; the other ten modules have separate research translations but are not yet compiled into that host. The preparer rechecks original instruction bytes and saved verification metadata, validates every registration address and requires an exact entry for each constructor. Its generated bindings stay outside Git.
 
+For an updated generation, also set `YAKUZA_BOOT_OVERLAY_BASELINE_DIRS` to the separately retained previous generation. This compares verified original payload/layout, decoded instruction coverage, every prior address-to-symbol registration and every earlier translation source. All checks complete before bindings are written. It preserves aliases individually; replacing one old address with a new address at the same total count fails. It does not classify new code or prove pointer provenance. Retain the actual 95,309-entry GAME baseline for the next recovery; original-code checks remain blocked until its private inputs are recovered.
+
 ```sh
 source /workspace/.cache/yakuza-onboarding/activate.sh
 cmake -S . -B /workspace/scratch/yakuza-pal/project-build \
@@ -55,4 +57,4 @@ The same target cross-builds with the Windows toolchain, including Unicode comma
 
 Missing indirect targets encountered in a verified active overlay can be identified with `SeedOverlayIndirect.java`. It checks the target's bounds and original first instruction before changing analysis metadata, rejecting conflicts with classified functions. For related entries from an observed resident method table, first verify the supported resident ELF's SHA-256 and every original table word, then check the module's original instructions. The current GAME pass adds two such methods referenced by the table at `0x00148620`. Re-export into a fresh directory, verify the instruction digest and regenerate the translation; do not skip missing calls. Check that earlier callable entries remain registered. This does not establish complete execution coverage.
 
-Further work needs missing indirect targets, runtime compatibility and original archive assets. Rendering, sound, controls, saves and gameplay remain unverified. The three complete OGRE.CVM, OGRE2.CVM and OGRE3.CVM archives are absent; supplied partial excerpts support the currently observed reads.
+Further work needs verified indirect targets and runtime compatibility. Rendering, sound, controls, saves and gameplay remain unverified. Complete archives were verified during earlier development, but the resumed executor has not recovered those private originals or analysis/generated outputs.

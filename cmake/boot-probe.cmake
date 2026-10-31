@@ -80,15 +80,25 @@ execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/too
     ${supplement_args}
     COMMAND_ERROR_IS_FATAL ANY)
 set(YAKUZA_BOOT_OVERLAY_DIRS "" CACHE STRING "Private verified overlay analysis directories; separate with semicolons")
+set(YAKUZA_BOOT_OVERLAY_BASELINE_DIRS "" CACHE STRING "Retained verified overlay generations to preserve; separate with semicolons")
 set(overlay_args)
 foreach(folder IN LISTS YAKUZA_BOOT_OVERLAY_DIRS)
     list(APPEND overlay_args --module-dir "${folder}")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
         "${folder}/layout.json" "${folder}/verification.json" "${folder}/decoded.csv"
+        "${folder}/analysis.elf" "${folder}/coverage.json" "${folder}/seeds.txt"
+        "${folder}/generated/register_functions.cpp")
+endforeach()
+foreach(folder IN LISTS YAKUZA_BOOT_OVERLAY_BASELINE_DIRS)
+    list(APPEND overlay_args --previous-module-dir "${folder}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${folder}/layout.json" "${folder}/verification.json" "${folder}/decoded.csv"
+        "${folder}/analysis.elf" "${folder}/coverage.json" "${folder}/seeds.txt"
         "${folder}/generated/register_functions.cpp")
 endforeach()
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_overlays.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_supplement.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/overlay_image.py")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_overlays.py"
     --out-dir "${boot_private}" ${overlay_args} COMMAND_ERROR_IS_FATAL ANY)

@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 
 from overlay_image import SLOT_START, parse_overlay, verify
+from prepare_boot_supplement import read_ranges, subtract
 from prepare_game import require
 
 
@@ -72,13 +73,49 @@ def cmake_path(path):
     return "[==[" + value + "]==]"
 
 
-def prepare(folders, output):
+def retained_translation(previous_folder, previous, folder, current):
+    """Compare verified generations, including aliases rather than just counts."""
+    old_layout, old_entries, old_files, _ = previous
+    layout, entries, _, _ = current
+    require(layout == old_layout, "Updated overlay changed original guest bytes or layout")
+    require(not subtract(read_ranges(previous_folder / "decoded.csv"), read_ranges(folder / "decoded.csv")),
+            "Updated overlay removed previously decoded instructions")
+    current_entries = dict(entries)
+    require(all(current_entries.get(address) == symbol for address, symbol in old_entries),
+            "Updated overlay removed or replaced a previous callable entry")
+    for symbol in sorted({symbol for _, symbol in old_entries}):
+        old_source = previous_folder / "generated" / (symbol + ".cpp")
+        source = folder / "generated" / (symbol + ".cpp")
+        require(source.read_bytes() == old_source.read_bytes(),
+                "Updated overlay changed a previous translation source: " + symbol)
+    return {"retained_entries": len(old_entries), "retained_sources": len(old_files)}
+
+
+def prepare(folders, output, previous_folders=()):
     require(not output.resolve().is_relative_to(Path(__file__).resolve().parents[1]),
             "Keep generated overlay bindings outside the checkout")
-    modules = [module(folder.resolve()) for folder in folders]
+    folders = [folder.resolve() for folder in folders]
+    modules = [module(folder) for folder in folders]
     require(len({item[0]["module_id"] for item in modules}) == len(modules), "Duplicate compiled overlay ID")
+    previous_folders = [folder.resolve() for folder in previous_folders]
+    previous = [module(folder) for folder in previous_folders]
+    require(len({item[0]["module_id"] for item in previous}) == len(previous), "Duplicate baseline overlay ID")
+    current_by_id = {item[0]["module_id"]: (folder, item) for folder, item in zip(folders, modules)}
+    retention = {}
+    for previous_folder, baseline in zip(previous_folders, previous):
+        ident = baseline[0]["module_id"]
+        require(ident in current_by_id, "Baseline overlay is absent from the current module selection")
+        folder, current = current_by_id[ident]
+        require(folder != previous_folder, "Overlay baseline must be a separate retained generation")
+        retention[ident] = retained_translation(previous_folder, baseline, folder, current)
     source = '#include "yakuza/boot_overlays.h"\n'
     cmake = 'set(YAKUZA_BOOT_OVERLAY_TARGETS)\n'
+    # Re-run the comparison if an earlier or current compilation input changes.
+    # Physical paths also cover translations reused through symbolic links.
+    watched_sources = sorted({path for item in modules + previous for path in item[2]})
+    if watched_sources:
+        cmake += 'set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS\n'
+        cmake += ''.join('    ' + cmake_path(path) + '\n' for path in watched_sources) + ')\n'
     report = []
     for index, (layout, entries, files, fingerprint) in enumerate(modules):
         for symbol in sorted({symbol for _, symbol in entries}):
@@ -103,7 +140,8 @@ def prepare(folders, output):
                 cmake += f'set_source_files_properties({cmake_path(path)} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)\n'
         cmake += f'list(APPEND YAKUZA_BOOT_OVERLAY_TARGETS {target})\n'
         report.append({"module": layout["name"], "id": layout["module_id"], "sources": len(files),
-                       "entries": len(entries), "file_sha256": layout["file_sha256"]})
+                       "entries": len(entries), "file_sha256": layout["file_sha256"],
+                       **retention.get(layout["module_id"], {})})
     source += 'namespace yakuza {\nstd::span<const BootOverlay> compiled_boot_overlays() {\n'
     if modules:
         source += '    static const BootOverlay programs[] = {\n'
@@ -123,9 +161,11 @@ def prepare(folders, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--module-dir', type=Path, action='append', default=[])
+    parser.add_argument('--previous-module-dir', type=Path, action='append', default=[],
+                        help='Retained verified generation whose guest bytes, entries and sources must survive')
     parser.add_argument('--out-dir', type=Path, required=True)
     args = parser.parse_args()
-    print(json.dumps(prepare(args.module_dir, args.out_dir)))
+    print(json.dumps(prepare(args.module_dir, args.out_dir, args.previous_module_dir)))
 
 
 if __name__ == '__main__':
