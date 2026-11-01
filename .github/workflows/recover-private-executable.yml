@@ -1,0 +1,62 @@
+name: Recover private Windows executable (encrypted)
+on:
+  push:
+    branches: ['recovery/pal-catalog-20261101']
+permissions:
+  contents: write
+jobs:
+  recover:
+    if: github.repository == 'TatsunaKyo/YakuzaRecomp'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install encryption dependency
+        run: python -m pip install --disable-pip-version-check 'cryptography==50.0.2'
+      - name: Verify and encrypt the private archive
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, struct, subprocess
+          from pathlib import Path
+          from cryptography.hazmat.primitives import hashes, serialization
+          from cryptography.hazmat.primitives.asymmetric import padding
+          from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+          root=Path(os.environ['RUNNER_TEMP'])/'yakuza-executable-recovery'
+          root.mkdir(mode=0o700)
+          source=root/'source.zip'
+          with source.open('xb') as stream:
+              subprocess.run(['gh','api','repos/'+os.environ['GITHUB_REPOSITORY']+'/releases/assets/681476054','-H','Accept: application/octet-stream'],stdout=stream,check=True)
+          data=source.read_bytes()
+          expected='280aa42c900ab714e3d82e18f0b0b235875374a67f043dd36e681e73287ce78f'
+          if len(data)!=66392585 or hashlib.sha256(data).hexdigest()!=expected:
+              raise ValueError('Original private ZIP checksum/size differs')
+          public=serialization.load_pem_public_key(b'-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAlMoPybKN9Irtrl0EqQFP\nUVYzcjlbyWCZpqG5V2nmCON+gBwyhC2EV/MHKk9/d5LAeAMZPoilarMSVLPloTtm\naPXLm2a1sqRgdS06daRwvFRlchlPf2NBNF4uZTKym4aMR3Yyr+s3NsKvIgjP6041\nA1CTFUbeJ+jCRre2/YzWokgmR1Yb7cf8jCbFBXOnnkJYKEM3+9WvtqScDR5vKhJx\nCfG4uI++fMLbg2cCARWZnwlW7tZsYxZgJqnydDj+0+C4+Nec/3OK2lhwp3ueIytI\nf9yyBGf4GsO/NRz+7N/4NXFypmNhKURJZvIcYKqSFNh7iOkK20WFJ1+4WZCloKHJ\nTN2fKu7vXfphYMsoe3uyJMr4F0r5gTIxKU6gIH0TwnD8ONazd3f9wdHceMqbaoxF\nlfp8KGlhKGUINfUSUSKE4Ug7On5eAjaqQ5i2T9fPSX924IDcwQPQEQuELBdX0V1q\njRbngzPfk9+Knd4XNgvCtLubWibMFb9kJ8Kykg4Y1X0xAgMBAAE=\n-----END PUBLIC KEY-----\n')
+          context='yakuza-executable-recovery/v1:681476054:280aa42c900ab714e3d82e18f0b0b235875374a67f043dd36e681e73287ce78f'.encode()
+          aes=AESGCM.generate_key(bit_length=256)
+          nonce=os.urandom(12)
+          wrapped=public.encrypt(aes,padding.OAEP(mgf=padding.MGF1(hashes.SHA256()),algorithm=hashes.SHA256(),label=context))
+          payload=b'YKRECOV1'+struct.pack('<I',len(wrapped))+wrapped+nonce+AESGCM(aes).encrypt(nonce,data,context)
+          (root/'payload.encrypted').write_bytes(payload)
+          (root/'manifest.json').write_text(json.dumps({'format':'yakuza-executable-recovery/v1','context':'yakuza-executable-recovery/v1:681476054:280aa42c900ab714e3d82e18f0b0b235875374a67f043dd36e681e73287ce78f','source_sha256':expected,'source_bytes':len(data),'encrypted_sha256':hashlib.sha256(payload).hexdigest(),'encrypted_bytes':len(payload)},indent=2))
+          source.unlink()
+          print('Verified private source archive and encrypted it for the requesting executor.')
+          PY
+      - name: Transfer only authenticated ciphertext
+        uses: actions/upload-artifact@v4
+        with:
+          name: yakuza-executable-encrypted-20261101
+          path: |
+            ${{ runner.temp }}/yakuza-executable-recovery/payload.encrypted
+            ${{ runner.temp }}/yakuza-executable-recovery/manifest.json
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Remove private workspace copy
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/yakuza-executable-recovery"
