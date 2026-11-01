@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Bind private verified overlay translations to the native boot host."""
 import argparse
+import bisect
 from dataclasses import asdict
 import hashlib
 import json
@@ -10,6 +11,7 @@ import re
 from overlay_image import SLOT_START, parse_overlay, verify
 from prepare_boot_supplement import read_ranges, subtract
 from prepare_game import require
+from recover_game_catalog import recover
 
 
 def fnv(data):
@@ -91,7 +93,7 @@ def retained_translation(previous_folder, previous, folder, current):
     return {"retained_entries": len(old_entries), "retained_sources": len(old_files)}
 
 
-def prepare(folders, output, previous_folders=()):
+def prepare(folders, output, previous_folders=(), recovered_executable=None, recovered_game=None):
     require(not output.resolve().is_relative_to(Path(__file__).resolve().parents[1]),
             "Keep generated overlay bindings outside the checkout")
     folders = [folder.resolve() for folder in folders]
@@ -108,6 +110,28 @@ def prepare(folders, output, previous_folders=()):
         folder, current = current_by_id[ident]
         require(folder != previous_folder, "Overlay baseline must be a separate retained generation")
         retention[ident] = retained_translation(previous_folder, baseline, folder, current)
+    require((recovered_executable is None) == (recovered_game is None),
+            "Recovered catalog comparison needs both the original executable and GAME image")
+    if recovered_executable is not None:
+        catalog = recover(recovered_executable.read_bytes(), recovered_game.read_bytes())
+        require(2 in current_by_id, "Recovered GAME baseline is absent from the module selection")
+        current_folder, current = current_by_id[2]
+        require(current[0]["file_sha256"] == catalog["game_sha256"],
+                "Current GAME differs from the recovered executable's original image")
+        old_entries = {address for address, _ in catalog["entries"]}
+        new_entries = {address for address, _ in current[1]}
+        decoded = read_ranges(current_folder / "decoded.csv")
+        starts = [lo for lo, _ in decoded]
+        require(all((index := bisect.bisect_right(starts, address) - 1) >= 0 and
+                    address < decoded[index][1] for address in old_entries),
+                "Fresh decoded map lacks an actual recovered callable instruction")
+        require(old_entries <= new_entries, "Updated GAME removed an actual recovered callable entry")
+        retention.setdefault(2, {}).update({
+            "retained_recovered_entries": len(old_entries),
+            "recovered_executable_sha256": catalog["executable_sha256"],
+            "recovered_table_sha256": catalog["table_sha256"],
+            "historical_decoded_coverage": "unverified; historical map unavailable",
+            "historical_cpp_bytes": "unverified; historical sources unavailable"})
     source = '#include "yakuza/boot_overlays.h"\n'
     cmake = 'set(YAKUZA_BOOT_OVERLAY_TARGETS)\n'
     # Re-run the comparison if an earlier or current compilation input changes.
@@ -163,9 +187,14 @@ def main():
     parser.add_argument('--module-dir', type=Path, action='append', default=[])
     parser.add_argument('--previous-module-dir', type=Path, action='append', default=[],
                         help='Retained verified generation whose guest bytes, entries and sources must survive')
+    parser.add_argument('--recovered-executable', type=Path,
+                        help='Verified original private callback PE for actual catalog retention')
+    parser.add_argument('--recovered-game', type=Path,
+                        help='Verified original GAME image bound to that executable')
     parser.add_argument('--out-dir', type=Path, required=True)
     args = parser.parse_args()
-    print(json.dumps(prepare(args.module_dir, args.out_dir, args.previous_module_dir)))
+    print(json.dumps(prepare(args.module_dir, args.out_dir, args.previous_module_dir,
+                             args.recovered_executable, args.recovered_game)))
 
 
 if __name__ == '__main__':

@@ -81,7 +81,18 @@ execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/too
     COMMAND_ERROR_IS_FATAL ANY)
 set(YAKUZA_BOOT_OVERLAY_DIRS "" CACHE STRING "Private verified overlay analysis directories; separate with semicolons")
 set(YAKUZA_BOOT_OVERLAY_BASELINE_DIRS "" CACHE STRING "Retained verified overlay generations to preserve; separate with semicolons")
+set(YAKUZA_BOOT_RECOVERED_EXE "" CACHE FILEPATH "Original private Windows callback PE for actual GAME catalog retention")
+set(YAKUZA_BOOT_RECOVERED_GAME "" CACHE FILEPATH "Original verified GAME image bound to that private PE")
 set(overlay_args)
+if(YAKUZA_BOOT_RECOVERED_EXE OR YAKUZA_BOOT_RECOVERED_GAME)
+    if(NOT YAKUZA_BOOT_RECOVERED_EXE OR NOT YAKUZA_BOOT_RECOVERED_GAME)
+        message(FATAL_ERROR "Recovered GAME comparison needs both the original PE and GAME image")
+    endif()
+    list(APPEND overlay_args --recovered-executable "${YAKUZA_BOOT_RECOVERED_EXE}"
+        --recovered-game "${YAKUZA_BOOT_RECOVERED_GAME}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${YAKUZA_BOOT_RECOVERED_EXE}" "${YAKUZA_BOOT_RECOVERED_GAME}")
+endif()
 foreach(folder IN LISTS YAKUZA_BOOT_OVERLAY_DIRS)
     list(APPEND overlay_args --module-dir "${folder}")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
@@ -98,6 +109,7 @@ foreach(folder IN LISTS YAKUZA_BOOT_OVERLAY_BASELINE_DIRS)
 endforeach()
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_overlays.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/recover_game_catalog.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_supplement.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/overlay_image.py")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_overlays.py"
