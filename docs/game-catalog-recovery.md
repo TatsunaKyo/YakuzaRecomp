@@ -42,7 +42,20 @@ Translation uses pinned PS2Recomp `eb8688b2fd191129f103a39543002c005b33409c`. Th
 
 The complete regenerated GAME object module compiles on Linux and cross-compiles for Windows x64 with verified LLVM-MinGW 20261006. Actual generated code for `0x69ff40` and `0x69ff50` passes 256 cases across unoptimized/optimized Linux builds, checking the original return PC, full CPU state and unchanged RAM. [The optional original-code harness](../tests/test_recovered_game_returns.cpp) requires the private translations and pinned runtime headers; ordinary CI does not execute these game routines. Cross-compilation is not Windows runtime validation.
 
-The old decoded map and source bytes remain unverified. These fresh counts, build checks and small-method cases do not establish whole-game equivalence, playable performance, correct rendering or Windows runtime stability. The resident/MAIN generated-source tree is also still unavailable, so a complete new game-host build has not been produced.
+The old decoded map and source bytes remain unverified. These fresh counts, build checks and small-method cases do not establish whole-game equivalence, playable performance, correct rendering or Windows runtime stability. The historical resident/MAIN generated-source tree also remains unavailable.
+
+
+## Resident and MAIN recovery
+
+[recover_resident_catalog.py](../tools/recover_resident_catalog.py) verifies the exact previous executable and the two original disc files. It follows both native startup initializers and checks every RIP-relative function-pointer store against the native dispatch bounds, the PE unwind table and a unique translated COFF symbol. The base initializer registers 330,579 addresses, and the supplement registers 3,238. The base wins for the 1,349 shared slots, yielding **332,468 effective resident/MAIN addresses**.
+
+A fresh Ghidra export from the verified disc bytes initially covered 766,697 instructions and 332,444 of those addresses. It missed 24 previously registered instructions across two owners. Reinstating the relevant original control-flow ranges, excluding a false-positive data record and supplying catalog-backed entry hints yields **332,473 registrations, including all 332,468 old addresses**. PS2Recomp reports zero errors, decode failures, unhandled instructions or critical fallbacks. The existing Windows build adaptations still validate all 17 PAL VU0 source fingerprints. The fresh table changes the translated owner start for 958 old addresses, so equivalence to the previous translation remains unverified.
+
+## Isolated Windows callback retest
+
+[prepare_windows_callback_retest.py](../tools/prepare_windows_callback_retest.py) starts with the exact previous Windows PE and the verified GAME image. Compile the generated `0x69ff40` and `0x69ff50` methods with the verified LLVM-MinGW Windows x64 compiler, `-O2`, and default return diagnostics. Their extracted `.text` must match byte for byte. Pass that leaf to the tool with `--compiled-leaf`.
+
+The tool changes the GAME descriptor's span and appends a relocated, read-only copy of the registration table plus the compiled return leaf. It preserves all **95,309 existing native mappings**, the old host executable code and the original guest bytes. The resulting 95,311-entry build isolates the two original `JR $ra`/NOP methods for comparison with the maintainer's previous Windows test. The separate source rebuild links a complete Windows x64 host with all four verified table methods and the rest of the regenerated GAME module. The linked PE has 95,347 executable GAME mappings, including every old address, and keeps the 8 MiB Windows stack reserve. Actual Windows 11 execution remains pending.
 
 ## Reproduce from the private inputs
 
