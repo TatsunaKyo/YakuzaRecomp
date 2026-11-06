@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from prepare_game import FormatError
 from prepare_boot_overlays import prepare
 from recover_game_catalog import PE, recover
+from recover_resident_catalog import restore_boot_extent
 
 
 def pe_fixture():
@@ -74,6 +75,14 @@ class RecoveryParserTests(unittest.TestCase):
             with self.assertRaisesRegex(FormatError, "both the original executable and GAME"):
                 prepare([], output, recovered_executable=Path(temp) / "not-read.exe")
             self.assertFalse(output.exists())
+
+    def test_main_extent_repair_keeps_neighbor_and_rejects_overlap(self):
+        first = "Name,Start,End,Size\nFUN_0019f220,0x19f220,0x19f224,4\n"
+        neighbor = "FUN_0019f2e0,0x19f2e0,0x19f2e4,4\n"
+        self.assertEqual(restore_boot_extent(first + neighbor),
+                         first.replace("0x19f224,4", "0x19f2e0,192") + neighbor)
+        with self.assertRaisesRegex(FormatError, "overlapping"):
+            restore_boot_extent(first + "other,0x19f2dc,0x19f2e0,4\n")
 
 
 if __name__ == "__main__": unittest.main()

@@ -51,6 +51,10 @@ The old decoded map and source bytes remain unverified. These fresh counts, buil
 
 A fresh Ghidra export from the verified disc bytes initially covered 766,697 instructions and 332,444 of those addresses. It missed 24 previously registered instructions across two owners. Reinstating the relevant original control-flow ranges, excluding a false-positive data record and supplying catalog-backed entry hints yields **332,473 registrations, including all 332,468 old addresses**. PS2Recomp reports zero errors, decode failures, unhandled instructions or critical fallbacks. The existing Windows build adaptations still validate all 17 PAL VU0 source fingerprints. The fresh table changes the translated owner start for 958 old addresses, so equivalence to the previous translation remains unverified.
 
+The first rebuilt Linux host passed the original MAIN checkpoint, then stopped at `0x19f224`. Fresh analysis had treated the `PREF` at `0x19f220` as the entire translated routine. The old native owner records the 47 consecutive guest PCs through `0x19f2d8`. The original MAIN bytes verify its final jump to `0x19f1d0` and the NOP delay slot at `0x19f2dc`. Restoring the range through `0x19f2e0` changes three regenerated files and preserves all registrations. A Linux replay of the repaired host progressed through that stop and activated the verified GAME overlay with 95,347 entries.
+
+To reproduce the repair on the private decoded map, pass `--decoded-map` and `--out-decoded-map` to the resident catalog recovery tool. It checks the exact old executable, original MAIN and the unchanged one-instruction row before writing the restored range. The neighboring range must stay disjoint.
+
 ## Isolated Windows callback retest
 
 [prepare_windows_callback_retest.py](../tools/prepare_windows_callback_retest.py) starts with the exact previous Windows PE and the verified GAME image. Compile the generated `0x69ff40` and `0x69ff50` methods with the verified LLVM-MinGW Windows x64 compiler, `-O2`, and default return diagnostics. Their extracted `.text` must match byte for byte. Pass that leaf to the tool with `--compiled-leaf`.

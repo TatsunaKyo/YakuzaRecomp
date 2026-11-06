@@ -2,7 +2,9 @@
 """Recover the actual resident/MAIN registrations from the retained Windows PE."""
 import argparse
 from collections import defaultdict
+import csv
 import hashlib
+import io
 import json
 from pathlib import Path
 import re
@@ -16,13 +18,16 @@ INITIALIZERS = (
     ("base", "_GLOBAL__sub_I_register_boot.cpp", "g_ps2RecompiledFunctionTable", 330579),
     ("supplement", "_GLOBAL__sub_I_boot_supplement.cpp", "g_yakuzaSupplementTable", 3238),
 )
+MAIN_ROUTINE = (0x19f220, 0x19f2e0)
+MAIN_ROUTINE_SHA256 = "0c9a48abefa3a73c8c84471a2a037fdc6bacbd5a29e602863fd0a48cbdd94ffe"
 
 
 def recover(executable, disc_dir):
     require(hashlib.sha256(executable).hexdigest() == EXE_SHA256,
             "Executable differs from the verified private callback package")
-    for name in ("SLES_541.71", "MAIN.BIN"):
-        require(hashlib.sha256((disc_dir / name).read_bytes()).hexdigest() == PAL_INPUTS[name],
+    originals = {name: (disc_dir / name).read_bytes() for name in ("SLES_541.71", "MAIN.BIN")}
+    for name, data in originals.items():
+        require(hashlib.sha256(data).hexdigest() == PAL_INPUTS[name],
                 f"Unsupported original {name}")
 
     pe = PE(executable)
@@ -101,6 +106,21 @@ def recover(executable, disc_dir):
     supplement_entries = result["supplement"]["entries"]
     require(len(base_entries.keys() | supplement_entries.keys()) == 332468,
             "Actual resident/MAIN dispatch union differs")
+    first, end = MAIN_ROUTINE
+    native = int(base_entries[hex(first)], 16)
+    name, guest = result["base"]["native_owners"][hex(native)]
+    require((name, guest) == ("FUN_0019f220", hex(first)), "Unexpected native owner for the truncated routine")
+    native_code = pe.read(native, pe.base + unwind_ends[native - pe.base] - native, 0x20000000)
+    # The exact old Debug PE stores guest PCs in R5900Context::pc at +0x200.
+    # The terminal direct jump records its destination, and its NOP needs no store.
+    pc_stores = re.findall(rb"\xc7[\x80-\x87]\x00\x02\x00\x00(.{4})", native_code, re.S)
+    pcs = {struct.unpack("<I", value)[0] for value in pc_stores}
+    require(pcs == set(range(first, end - 4, 4)) | {0x19f1d0},
+            "The previous native routine does not verify the complete MAIN extent")
+    original = originals["MAIN.BIN"][first - 0x167c00:end - 0x167c00]
+    require(hashlib.sha256(original).hexdigest() == MAIN_ROUTINE_SHA256 and
+            struct.unpack_from("<II", original, len(original) - 8) == (0x08067c74, 0),
+            "Original MAIN routine bytes, jump or delay slot differ")
     return {
         "format": "yakuza-recovered-resident-catalog/v1",
         "executable_sha256": EXE_SHA256,
@@ -110,8 +130,37 @@ def recover(executable, disc_dir):
         "overlapping_entries": len(base_entries.keys() & supplement_entries.keys()),
         "historical_instruction_coverage_verified": False,
         "historical_generated_source_bytes_verified": False,
+        "verified_main_extent": {
+            "start": hex(first), "end_exclusive": hex(end),
+            "native_owner": hex(native), "guest_pc_stores": len(pcs) - 1,
+            "original_sha256": MAIN_ROUTINE_SHA256,
+        },
         **result,
     }
+
+
+def restore_boot_extent(text):
+    first, end = MAIN_ROUTINE
+    reader = csv.DictReader(io.StringIO(text))
+    require(reader.fieldnames == ["Name", "Start", "End", "Size"], "Unexpected decoded map header")
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=reader.fieldnames, lineterminator="\n")
+    writer.writeheader()
+    changed, previous = 0, 0
+    for row in reader:
+        lo, hi = int(row["Start"], 0), int(row["End"], 0)
+        if lo == first:
+            require(row["Name"] == "FUN_0019f220" and hi == first + 4 and row["Size"] == "4",
+                    "Decoded map does not contain the verified truncated routine")
+            hi = end
+            row.update(End=hex(hi), Size=str(hi - lo))
+            changed += 1
+        require(previous <= lo < hi and (lo | hi) % 4 == 0 and int(row["Size"]) == hi - lo,
+                "Invalid or overlapping decoded ranges")
+        writer.writerow(row)
+        previous = hi
+    require(changed == 1, "Missing unique MAIN routine to restore")
+    return output.getvalue()
 
 
 def main():
@@ -119,10 +168,17 @@ def main():
     parser.add_argument("--previous-exe", type=Path, required=True)
     parser.add_argument("--disc-dir", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--decoded-map", type=Path)
+    parser.add_argument("--out-decoded-map", type=Path)
     args = parser.parse_args()
-    require(not args.out.resolve().is_relative_to(Path(__file__).resolve().parents[1]),
+    require(bool(args.decoded_map) == bool(args.out_decoded_map), "Specify both decoded map paths")
+    project = Path(__file__).resolve().parents[1]
+    require(all(not path.resolve().is_relative_to(project) for path in (args.out, args.out_decoded_map) if path),
             "Keep the private native catalog outside the checkout")
     result = recover(args.previous_exe.read_bytes(), args.disc_dir)
+    if args.out_decoded_map:
+        restored = restore_boot_extent(args.decoded_map.read_text())
+        write_new(args.out_decoded_map, restored.encode())
     write_new(args.out, (json.dumps(result, separators=(",", ":")) + "\n").encode())
     print(f"Recovered {result['effective_entries']} effective resident/MAIN registrations "
           f"with {result['overlapping_entries']} shared slots")
