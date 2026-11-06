@@ -9,6 +9,9 @@ import ghidra.program.model.mem.MemoryBlock;
 import java.io.PrintWriter;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class ExportOverlay extends GhidraScript {
     private static class Range {
@@ -23,7 +26,15 @@ public class ExportOverlay extends GhidraScript {
 
     public void run() throws Exception {
         String[] args = getScriptArgs();
-        if (args.length != 5) throw new IllegalArgumentException("Expected CSV, JSON, start, end and prefix");
+        if (args.length != 5 && args.length != 6)
+            throw new IllegalArgumentException("Expected CSV, JSON, start, end, prefix and optional recovered seeds");
+        HashMap<Long,String> recovered = new HashMap<>();
+        if (args.length == 6) {
+            for (String line : Files.readAllLines(Path.of(args[5]))) {
+                String[] fields = line.split(" ", 2);
+                recovered.put(Long.parseUnsignedLong(fields[0], 16), args[4] + "_" + fields[1]);
+            }
+        }
         ArrayList<Range> ranges = new ArrayList<>();
         Range range = null;
         long instructionCount = 0;
@@ -41,9 +52,9 @@ public class ExportOverlay extends GhidraScript {
             Function function = currentProgram.getFunctionManager().getFunctionContaining(address);
             Function entry = currentProgram.getFunctionManager().getFunctionAt(address);
             long owner = function == null ? -1 : function.getEntryPoint().getOffset();
-            if (range == null || start != range.end || owner != range.owner || entry != null) {
+            if (range == null || start != range.end || owner != range.owner || entry != null || recovered.containsKey(start)) {
                 String name = entry == null ? String.format("decoded_chunk_%08X", start) : entry.getName().replace(',', '_');
-                range = new Range(args[4] + "_" + name, start, start + 4, owner);
+                range = new Range(recovered.getOrDefault(start, args[4] + "_" + name), start, start + 4, owner);
                 ranges.add(range);
             } else {
                 range.end = start + 4;
