@@ -16,7 +16,7 @@ The retained private Windows callback package at source `fc2938111aaf71d177ab828
 
 ## Original callback provenance
 
-The latest reported Windows stop remains `0x29c4c4 -> 0x69ff50`. Original static bytes establish this chain:
+The earlier Windows callback stop was `0x29c4c4 -> 0x69ff50`. Original static bytes establish this chain.
 
 | Location | Original operation |
 | --- | --- |
@@ -54,6 +54,17 @@ A fresh Ghidra export from the verified disc bytes initially covered 766,697 ins
 The first rebuilt Linux host passed the original MAIN checkpoint, then stopped at `0x19f224`. Fresh analysis had treated the `PREF` at `0x19f220` as the entire translated routine. The old native owner records the 47 consecutive guest PCs through `0x19f2d8`. The original MAIN bytes verify its final jump to `0x19f1d0` and the NOP delay slot at `0x19f2dc`. Restoring the range through `0x19f2e0` changes three regenerated files and preserves all registrations. A Linux replay of the repaired host progressed through that stop and activated the verified GAME overlay with 95,347 entries.
 
 To reproduce the repair on the private decoded map, pass `--decoded-map` and `--out-decoded-map` to the resident catalog recovery tool. It checks the exact old executable, original MAIN and the unchanged one-instruction row before writing the restored range. The neighboring range must stay disjoint.
+
+## Direct GAME calls into MAIN
+
+A Windows run of the November 9 host stopped at a direct GAME call from `0x635910` to `0x29f930` after activating the verified GAME overlay. Comparing the translated GAME module's 3,963 direct transfers into MAIN with the original instructions and resident table found two missing destinations.
+
+| Original GAME JAL | MAIN range, end exclusive | Original behavior |
+| --- | --- | --- |
+| `0x635910` | `0x29f930–0x29f958` | Assign a 64-byte pool slot, advance the index and return the pointer in the return delay slot |
+| `0x6931f0` | `0x2d3540–0x2d355c` | Index the float table at `0x53def0` and load the result in the return delay slot |
+
+The 17 instructions form a separate MAIN supplement. For reproduction, add these two disjoint ranges to the verified private `resident-main-final.csv` and recompute the address-and-instruction coverage digest. Put the recovered `pal-resident-main.elf` at `yakuza-pal-analysis.elf` in the analysis directory. Run [prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) with the earlier CSV as `--baseline` and the updated analysis directory as `--analysis-dir`, then translate `additional.toml` with the pinned PS2Recomp. Pass the resulting `generated` directory as `YAKUZA_BOOT_SUPPLEMENT_DIR` when building the boot host.
 
 ## Isolated Windows callback retest
 

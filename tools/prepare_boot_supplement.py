@@ -11,6 +11,11 @@ import struct
 
 from prepare_game import read_small, region, require, sha256, write_new
 
+VERIFIED_ANALYSIS_IMAGES = {
+    "c359e46e9a505e4df8f4e591bd036799db1984dbd06e2b143d8b0962af052689",  # Original boot analysis ELF
+    "bbb6d8d9a6fbea88884ba0b12ac475bdf3cb8851de84a9353b1c55f9e0337d76",  # Recovered resident/MAIN ELF
+}
+
 
 def read_ranges(path):
     rows = list(csv.DictReader(io.StringIO(read_small(path).decode())))
@@ -73,7 +78,7 @@ def main():
     root = args.analysis_dir.resolve()
     require(not root.is_relative_to(Path(__file__).resolve().parents[1]), "Keep generated code outside the checkout")
     image = read_small(root / "yakuza-pal-analysis.elf")
-    require(sha256(image) == "c359e46e9a505e4df8f4e591bd036799db1984dbd06e2b143d8b0962af052689",
+    require(sha256(image) in VERIFIED_ANALYSIS_IMAGES,
             "Analysis image differs from the verified PAL resident/MAIN image")
     shoff = struct.unpack_from("<I", image, 32)[0]
     shsize, count = struct.unpack_from("<HH", image, 46)
