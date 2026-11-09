@@ -97,5 +97,27 @@ int main() {
     state.context.test = 3u << 17u; // Strict greater-than depth test.
     vertex.z = 12;
     if (!draw(kDestination, 12)) return 7;
+
+    std::fill(vram.begin(), vram.end(), 0);
+    backend.WriteVram(GS_PSM_CT32, kDepthBase, 1, 0, 0, 0x80ff00ffu);
+    GSPresentationRequest request{};
+    request.dispfb1 = request.dispfb2 = 1u << 9u; // Page zero, 64-pixel stride.
+    request.display1 = request.display2 = (63ull << 32u) | (63ull << 44u);
+    request.contextFrames[0] = {32, 1, GS_PSM_CT32, 0};
+    for (uint64_t mode : {1u, 2u, 3u}) {
+        request.pmode = mode;
+        const auto frame = backend.Present(request);
+        if (!frame || frame.sourceFbp != 0 || frame.width != 64 || frame.height != 64 ||
+            frame.pixels[0] != 0 || frame.pixels[1] != 0 || frame.pixels[2] != 0) {
+            std::cerr << "Black scanout selected an off-screen buffer for PMODE " << mode << '\n';
+            return 8;
+        }
+    }
+    request.pmode = 1;
+    request.hasPreferredSource = true;
+    request.preferredSource = {kDepthBase, 1, GS_PSM_CT32, 0};
+    const auto preferred = backend.Present(request);
+    if (!preferred || !preferred.usedPreferred || preferred.pixels[0] != 255 || preferred.pixels[2] != 255)
+        return 9;
     return 0;
 }

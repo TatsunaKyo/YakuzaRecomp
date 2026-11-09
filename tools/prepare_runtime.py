@@ -87,6 +87,17 @@ def adapt_gs_pixel_writes(text):
     return text[:start] + pixel + text[end:]
 
 
+def adapt_gs_scanout(text):
+    # A black display buffer is a valid image. Read the configured scanout
+    # even when an off-screen draw buffer contains colored pixels.
+    count_start = text.index("    uint32_t countNonBlackPixels(")
+    count_end = text.index("\n}", count_start)
+    text = replace(text, text[count_start:count_end], "")
+    fallback_start = text.index("        if (!usedPreferred && displayFrame.fbp == 0u && countNonBlackPixels(")
+    fallback_end = text.index("        return true;", fallback_start)
+    return replace(text, text[fallback_start:fallback_end], "")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime-dir", required=True, type=Path)
@@ -137,6 +148,12 @@ def main():
     // Only an explicit guest return to fallthroughPc completes a call. Native
     // SDK wrappers set PC to the caller before invoking their service.
 """)
+    # The host window polls the GS tick while the guest scheduler publishes it.
+    runtime = replace(runtime, "const uint64_t currentTick = rt->eeScheduler().currentVSyncTick();",
+                      "const uint64_t currentTick = rt->memory().gs().vsyncTick.load(std::memory_order_acquire);")
+    # Present a black screen while the guest has disabled scanout.
+    runtime = replace(runtime, "GenImageColor(FB_WIDTH, FB_HEIGHT, MAGENTA)",
+                      "GenImageColor(FB_WIDTH, FB_HEIGHT, BLACK)")
     texts["ps2_runtime.cpp"] = adapt_ipu_faults(runtime)
     thread = texts["Kernel/Syscalls/Thread.cpp"]
     thread = replace(thread, """            const int result = ee.changePriority(id, priority, interruptSafe, oldPriority);
@@ -181,7 +198,7 @@ def main():
     texts["ps2_memory.cpp"] = adapt_spr(adapt_ipu(texts["ps2_memory.cpp"]))
     texts["gs/ps2_gif_arbiter.cpp"] = adapt_path3_gif((source / "gs/ps2_gif_arbiter.cpp").read_bytes()).decode()
     texts["gs/gs_frontend.cpp"] = adapt_presentation((source / "gs/gs_frontend.cpp").read_bytes()).decode()
-    texts["gs/gs_cpu_backend.cpp"] = adapt_gs_pixel_writes(texts["gs/gs_cpu_backend.cpp"])
+    texts["gs/gs_cpu_backend.cpp"] = adapt_gs_scanout(adapt_gs_pixel_writes(texts["gs/gs_cpu_backend.cpp"]))
     # Copy the complete include tree so quoted sibling includes and PCHs see
     # the same adapted PS2Memory layout in every translation unit.
     for path in include.rglob("*"):

@@ -150,6 +150,17 @@ set_source_files_properties("${boot_private}/register_boot.cpp" "${boot_private}
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 set_source_files_properties("${boot_private}/boot_supplement.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_source_files_properties("${boot_private}/register_boot_overlays.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+option(YAKUZA_OPTIMIZE_BOOT_GUEST "Use -O1 for GCC/Clang translated code in Debug PAL boot hosts" OFF)
+if(YAKUZA_OPTIMIZE_BOOT_GUEST AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT MSVC)
+    foreach(guest_target IN ITEMS yakuza_boot_probe ${YAKUZA_BOOT_OVERLAY_TARGETS})
+        target_compile_options("${guest_target}" PRIVATE "$<$<CONFIG:Debug>:-O1>")
+    endforeach()
+    # Optimizing the large dispatch initializers adds substantial build time
+    # to code that runs only at startup. Keep their verifiable native layout.
+    set_property(SOURCE "${boot_private}/register_boot.cpp" "${boot_private}/boot_supplement.cpp"
+        "${boot_private}/register_boot_overlays.cpp" APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:-O0>")
+    set_source_files_properties("${boot_private}/register_boot.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+endif()
 if(YAKUZA_BOOT_SUPPLEMENT_DIR)
     file(GLOB supplement_sources CONFIGURE_DEPENDS "${YAKUZA_BOOT_SUPPLEMENT_DIR}/*.cpp")
     list(REMOVE_ITEM supplement_sources "${YAKUZA_BOOT_SUPPLEMENT_DIR}/register_functions.cpp")
