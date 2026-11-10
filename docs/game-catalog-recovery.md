@@ -66,6 +66,18 @@ A Windows run of the November 9 host stopped at a direct GAME call from `0x63591
 
 The 17 instructions form a separate MAIN supplement. For reproduction, add these two disjoint ranges to the verified private `resident-main-final.csv` and recompute the address-and-instruction coverage digest. Put the recovered `pal-resident-main.elf` at `yakuza-pal-analysis.elf` in the analysis directory. Run [prepare_boot_supplement.py](../tools/prepare_boot_supplement.py) with the earlier CSV as `--baseline` and the updated analysis directory as `--analysis-dir`, then translate `additional.toml` with the pinned PS2Recomp. Pass the resulting `generated` directory as `YAKUZA_BOOT_SUPPLEMENT_DIR` when building the boot host.
 
+## November 10 GAME method tables
+
+The next Windows run reached guest VSync tick 4,933 and stopped at GAME `0x62e9dc → 0x62e220`. The original caller loads the table pointer from object offset `0x70`, reads slot `0x278`, and passes bit index 6 in the JALR delay slot. It checks bits 7 and 8 through the same slot if the preceding bit is clear. The target reads the flag word at object offset `0x520` and returns the selected bit mask.
+
+The original GAME code at `0x6349d0` and `0x634c94` installs table pointers `0x146f60` and `0x146fd4` at object offsets `0x70` and `0xf0`. Their resident block ends at `0x147240` and has SHA-256 `eeb938056745f660a6be87d32a241f061e0534f83b82da6032384c2d6142ea68`. It contains 180 method pointers. The primary pointer plus `0x278` yields `0x62e220`. The same block contains the original caller at offset `0x2b4`.
+
+The supplement translates all 92 GAME methods missing from that block. It includes 697 newly decoded instructions and 106 previously decoded instructions from the complete switch routines at `0x62fe00` and `0x62fee0`. Their two original jump tables establish 15 previously unregistered case destinations. The expanded catalog has 95,466 callable addresses, retaining every earlier GAME address, owner and translated source. The two virtual tail jumps still dispatch through the runtime.
+
+The private checkpoint includes the original-byte range proofs, isolated translation and assembly script. Compose the supplement against the preceding verified GAME analysis, then pass the combined directory as `YAKUZA_BOOT_OVERLAY_DIRS` and the preceding directory as `YAKUZA_BOOT_OVERLAY_BASELINE_DIRS`. Keep the preceding resident/MAIN supplement in the build.
+
+The full Linux host reproduces the reported stop when the new slot is cleared. With the verified translation installed, the original caller passes its bit 6, 7 and 8 paths with the original table. The fixture also passes 192 bit-test cases and 56 switch cases. The updated movie sequence still needs a Windows run.
+
 ## Isolated Windows callback retest
 
 [prepare_windows_callback_retest.py](../tools/prepare_windows_callback_retest.py) starts with the exact previous Windows PE and the verified GAME image. Compile the generated `0x69ff40` and `0x69ff50` methods with the verified LLVM-MinGW Windows x64 compiler, `-O2`, and default return diagnostics. Their extracted `.text` must match byte for byte. Pass that leaf to the tool with `--compiled-leaf`.
