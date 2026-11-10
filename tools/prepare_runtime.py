@@ -25,6 +25,7 @@ HASHES = {
     "Kernel/EeScheduler.cpp": "89383df078a13e9d13335f158ce88f0fb85935c57f2edab0ef8f4a0c9edb4b83",
     "ps2_vif1_interpreter.cpp": "4090662ca7029c6563444e69ac184cf1396efdf672d179dd8e9d617fe856c4a5",
     "ps2_memory.cpp": "4bae084dfa6ea30479af5efde70c61927a4fe5a49216d99c3db76297db4ac22a",
+    "gs/gs_cpu_backend.cpp": "3f0fea655726215f56d8c3c9cff8345a7d36a929fe3f845cc96346a247085fa9",
 }
 MEMORY_HEADER_SHA256 = "9bba23a767b3ea0e3d7af5cf864b20aa730eb8ce4e07c005668ceb761527c770"
 
@@ -37,6 +38,64 @@ def replace(text, old, new, count=1):
 def save(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists() or path.read_bytes() != data: path.write_bytes(data)
+
+
+def adapt_gs_pixel_writes(text):
+    start = text.index("void GSCpuBackend::WritePixel(")
+    end = text.index("\nuint32_t GSCpuBackend::LookupCLUT(", start)
+    pixel = text[start:end]
+    depth_start = pixel.index("    bool zpass = false;")
+    depth_end = pixel.index("    if (writeMask.writesFramebuffer())", depth_start)
+    depth_test = pixel[depth_start:depth_end]
+    pixel = replace(pixel, depth_test, "")
+    pixel = replace(pixel, """    const bool alphaBlendEnabled = state.prim.abe;
+""", depth_test + """    const auto alphaMode = static_cast<uint8_t>(ctx.alpha);
+    // (A - A) * C + Cs and fixed unity scaling both yield the source RGB.
+    const bool blendRgb = state.prim.abe && !(state.pabe && (a & 0x80u) == 0u) &&
+                          !((alphaMode & 0xc0u) == 0u && (alphaMode & 3u) == ((alphaMode >> 2u) & 3u)) &&
+                          (ctx.alpha & 0xff000000ffull) != 0x80000000a8ull;
+    // RGB24 stores preserve the underlying word's high byte themselves.
+    const u32 framebufferMask = fpsm == GS_PSM_CT24 ? ctx.frame.fbmsk & 0x00ffffffu : ctx.frame.fbmsk;
+""")
+    pixel = replace(pixel, """    // small optimization, avoid reading the framebuffer for simple draws
+    // TODO: only one address lookup for rmw
+    const bool frmw = destinationAlphaTestNeedsRead || (writeMask.writesFramebuffer() && ((ctx.frame.fbmsk != 0) || alphaBlendEnabled || preserveDestinationAlpha));
+""", """    const bool frmw = destinationAlphaTestNeedsRead ||
+                      (writeMask.writesFramebuffer() && (framebufferMask || blendRgb || preserveDestinationAlpha));
+""")
+    blend_start = pixel.index("        const u8 srcR = r;")
+    blend_end = pixel.index("        if (writeMask.writeAlpha", blend_start)
+    body = pixel[blend_start:blend_end]
+    rgb_start = body.index("                uint64_t alphaReg = ctx.alpha;")
+    rgb_end = body.index("\n            }\n            else", rgb_start)
+    rgb = "\n".join(line[4:] if line else line for line in body[rgb_start:rgb_end].splitlines())
+    pixel = replace(pixel, body, """        if (blendRgb)
+        {
+            uint8_t dr = fbrgba & 0xFF;
+            uint8_t dg = (fbrgba >> 8) & 0xFF;
+            uint8_t db = (fbrgba >> 16) & 0xFF;
+            uint8_t da = (fbrgba >> 24) & 0xFF;
+
+""" + rgb + "\n        }\n\n")
+    pixel = replace(pixel, """        if (ctx.frame.fbmsk != 0)
+        {
+            pixel = (pixel & ~ctx.frame.fbmsk) | (fbrgba & ctx.frame.fbmsk);
+""", """        if (framebufferMask != 0)
+        {
+            pixel = (pixel & ~framebufferMask) | (fbrgba & framebufferMask);
+""")
+    return text[:start] + pixel + text[end:]
+
+
+def adapt_gs_scanout(text):
+    # A black display buffer is a valid image. Read the configured scanout
+    # even when an off-screen draw buffer contains colored pixels.
+    count_start = text.index("    uint32_t countNonBlackPixels(")
+    count_end = text.index("\n}", count_start)
+    text = replace(text, text[count_start:count_end], "")
+    fallback_start = text.index("        if (!usedPreferred && displayFrame.fbp == 0u && countNonBlackPixels(")
+    fallback_end = text.index("        return true;", fallback_start)
+    return replace(text, text[fallback_start:fallback_end], "")
 
 
 def main():
@@ -89,6 +148,12 @@ def main():
     // Only an explicit guest return to fallthroughPc completes a call. Native
     // SDK wrappers set PC to the caller before invoking their service.
 """)
+    # The host window polls the GS tick while the guest scheduler publishes it.
+    runtime = replace(runtime, "const uint64_t currentTick = rt->eeScheduler().currentVSyncTick();",
+                      "const uint64_t currentTick = rt->memory().gs().vsyncTick.load(std::memory_order_acquire);")
+    # Present a black screen while the guest has disabled scanout.
+    runtime = replace(runtime, "GenImageColor(FB_WIDTH, FB_HEIGHT, MAGENTA)",
+                      "GenImageColor(FB_WIDTH, FB_HEIGHT, BLACK)")
     texts["ps2_runtime.cpp"] = adapt_ipu_faults(runtime)
     thread = texts["Kernel/Syscalls/Thread.cpp"]
     thread = replace(thread, """            const int result = ee.changePriority(id, priority, interruptSafe, oldPriority);
@@ -133,6 +198,7 @@ def main():
     texts["ps2_memory.cpp"] = adapt_spr(adapt_ipu(texts["ps2_memory.cpp"]))
     texts["gs/ps2_gif_arbiter.cpp"] = adapt_path3_gif((source / "gs/ps2_gif_arbiter.cpp").read_bytes()).decode()
     texts["gs/gs_frontend.cpp"] = adapt_presentation((source / "gs/gs_frontend.cpp").read_bytes()).decode()
+    texts["gs/gs_cpu_backend.cpp"] = adapt_gs_scanout(adapt_gs_pixel_writes(texts["gs/gs_cpu_backend.cpp"]))
     # Copy the complete include tree so quoted sibling includes and PCHs see
     # the same adapted PS2Memory layout in every translation unit.
     for path in include.rglob("*"):

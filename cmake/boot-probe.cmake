@@ -80,15 +80,37 @@ execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/too
     ${supplement_args}
     COMMAND_ERROR_IS_FATAL ANY)
 set(YAKUZA_BOOT_OVERLAY_DIRS "" CACHE STRING "Private verified overlay analysis directories; separate with semicolons")
+set(YAKUZA_BOOT_OVERLAY_BASELINE_DIRS "" CACHE STRING "Retained verified overlay generations to preserve; separate with semicolons")
+set(YAKUZA_BOOT_RECOVERED_EXE "" CACHE FILEPATH "Original private Windows callback PE for actual GAME catalog retention")
+set(YAKUZA_BOOT_RECOVERED_GAME "" CACHE FILEPATH "Original verified GAME image bound to that private PE")
 set(overlay_args)
+if(YAKUZA_BOOT_RECOVERED_EXE OR YAKUZA_BOOT_RECOVERED_GAME)
+    if(NOT YAKUZA_BOOT_RECOVERED_EXE OR NOT YAKUZA_BOOT_RECOVERED_GAME)
+        message(FATAL_ERROR "Recovered GAME comparison needs both the original PE and GAME image")
+    endif()
+    list(APPEND overlay_args --recovered-executable "${YAKUZA_BOOT_RECOVERED_EXE}"
+        --recovered-game "${YAKUZA_BOOT_RECOVERED_GAME}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${YAKUZA_BOOT_RECOVERED_EXE}" "${YAKUZA_BOOT_RECOVERED_GAME}")
+endif()
 foreach(folder IN LISTS YAKUZA_BOOT_OVERLAY_DIRS)
     list(APPEND overlay_args --module-dir "${folder}")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
         "${folder}/layout.json" "${folder}/verification.json" "${folder}/decoded.csv"
+        "${folder}/analysis.elf" "${folder}/coverage.json" "${folder}/seeds.txt"
+        "${folder}/generated/register_functions.cpp")
+endforeach()
+foreach(folder IN LISTS YAKUZA_BOOT_OVERLAY_BASELINE_DIRS)
+    list(APPEND overlay_args --previous-module-dir "${folder}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${folder}/layout.json" "${folder}/verification.json" "${folder}/decoded.csv"
+        "${folder}/analysis.elf" "${folder}/coverage.json" "${folder}/seeds.txt"
         "${folder}/generated/register_functions.cpp")
 endforeach()
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_overlays.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/recover_game_catalog.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_supplement.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/overlay_image.py")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_boot_overlays.py"
     --out-dir "${boot_private}" ${overlay_args} COMMAND_ERROR_IS_FATAL ANY)
@@ -128,6 +150,17 @@ set_source_files_properties("${boot_private}/register_boot.cpp" "${boot_private}
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 set_source_files_properties("${boot_private}/boot_supplement.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_source_files_properties("${boot_private}/register_boot_overlays.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+option(YAKUZA_OPTIMIZE_BOOT_GUEST "Use -O1 for GCC/Clang translated code in Debug PAL boot hosts" OFF)
+if(YAKUZA_OPTIMIZE_BOOT_GUEST AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT MSVC)
+    foreach(guest_target IN ITEMS yakuza_boot_probe ${YAKUZA_BOOT_OVERLAY_TARGETS})
+        target_compile_options("${guest_target}" PRIVATE "$<$<CONFIG:Debug>:-O1>")
+    endforeach()
+    # Optimizing the large dispatch initializers adds substantial build time
+    # to code that runs only at startup. Keep their verifiable native layout.
+    set_property(SOURCE "${boot_private}/register_boot.cpp" "${boot_private}/boot_supplement.cpp"
+        "${boot_private}/register_boot_overlays.cpp" APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:-O0>")
+    set_source_files_properties("${boot_private}/register_boot.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+endif()
 if(YAKUZA_BOOT_SUPPLEMENT_DIR)
     file(GLOB supplement_sources CONFIGURE_DEPENDS "${YAKUZA_BOOT_SUPPLEMENT_DIR}/*.cpp")
     list(REMOVE_ITEM supplement_sources "${YAKUZA_BOOT_SUPPLEMENT_DIR}/register_functions.cpp")
@@ -187,6 +220,9 @@ if(BUILD_TESTING)
     target_link_libraries(boot_gif_tests PRIVATE ps2_runtime)
     target_include_directories(boot_gif_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/boot-host")
     add_test(NAME boot_gif COMMAND boot_gif_tests)
+    add_executable(boot_gs_pixels_tests tests/test_boot_gs_pixels.cpp)
+    target_link_libraries(boot_gs_pixels_tests PRIVATE ps2_runtime)
+    add_test(NAME boot_gs_pixels COMMAND boot_gs_pixels_tests)
     add_executable(boot_presentation_tests tests/test_boot_presentation.cpp
         tests/fixtures/boot-host/register_functions.cpp tests/fixtures/boot-host/synthetic_entry.cpp)
     target_link_libraries(boot_presentation_tests PRIVATE ps2_runtime)
